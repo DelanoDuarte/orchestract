@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<script>
+  (function () {
+    var stored = localStorage.getItem("themeMode");
+    if (stored === "light") {
+      document.documentElement.classList.remove("dark");
+    } else if (!stored) {
+      localStorage.setItem("themeMode", "dark");
+    }
+  })();
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Orchestract{% endblock %}</title>
+<!-- Tailwind must load (and inject its utility classes) before Basecoat's
+     CSS, so Basecoat's component styles can override Tailwind's preflight
+     reset rather than the other way around. -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @custom-variant dark (&:is(html.dark *));
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
+<link rel="stylesheet" href="/static/theme.css">
+<script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
+</head>
+<body class="min-h-svh bg-background text-foreground">
+<div class="flex min-h-svh">
+  {% if organization %}
+  <aside id="sidebar" class="sidebar" data-side="left">
+    <nav aria-label="Sidebar navigation">
+      <header class="flex items-center gap-2 px-3 py-4">
+        <span class="text-primary">{{ icon('zap', 'size-5') }}</span>
+        <span class="font-semibold tracking-tight">Orchestract</span>
+      </header>
+      <section class="scrollbar-sm">
+        <div role="group" aria-labelledby="group-label-nav">
+          <h3 id="group-label-nav">{{ organization.name }}</h3>
+          <ul>
+            <li>
+              <a href="/{{ organization.slug }}/" {% if active_nav == "dashboard" %}aria-current="page"{% endif %}>
+                {{ icon('layout-dashboard') }}<span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a href="/{{ organization.slug }}/documents" {% if active_nav == "documents" %}aria-current="page"{% endif %}>
+                {{ icon('file-text') }}<span>Documents</span>
+              </a>
+            </li>
+            <li>
+              <a href="/{{ organization.slug }}/workflows" {% if active_nav == "workflows" %}aria-current="page"{% endif %}>
+                {{ icon('git-branch') }}<span>Workflows</span>
+              </a>
+            </li>
+            <li>
+              <a href="/{{ organization.slug }}/agents" {% if active_nav == "agents" %}aria-current="page"{% endif %}>
+                {{ icon('users') }}<span>Agents</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </nav>
+  </aside>
+  {% endif %}
+
+  <div class="flex min-h-svh min-w-0 flex-1 flex-col">
+    <header class="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+      {% if organization %}
+      <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="Toggle sidebar"
+              onclick="document.getElementById('sidebar')?.toggle()">
+        {{ icon('menu') }}
+      </button>
+      {% else %}
+      <a href="/" class="flex items-center gap-2 font-semibold tracking-tight">
+        <span class="text-primary">{{ icon('zap', 'size-5') }}</span>
+        Orchestract
+      </a>
+      {% endif %}
+      <div class="flex items-center gap-2">
+        {% if organization %}
+        <a href="/" class="btn" data-variant="ghost" data-size="sm">
+          {{ icon('building-2', 'size-4') }}<span>Switch organization</span>
+        </a>
+        {% endif %}
+        <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="Toggle theme"
+                onclick="window.basecoat.theme.toggle()">
+          <span class="hidden dark:block">{{ icon('sun') }}</span>
+          <span class="block dark:hidden">{{ icon('moon') }}</span>
+        </button>
+      </div>
+    </header>
+    <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8 {{ "mx-auto w-full max-w-2xl" if not organization else "" }}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+</body>
+</html>

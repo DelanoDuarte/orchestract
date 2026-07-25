@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}New document{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">New document</h1>
+  <p class="text-sm text-muted-foreground">Starts running through the workflow you pick immediately.</p>
+</div>
+
+{% if error %}
+<div class="alert mb-4" data-variant="destructive"><section>{{ error }}</section></div>
+{% endif %}
+
+<div class="card mx-auto max-w-lg">
+  <section>
+    {% if workflows %}
+    <form method="post" action="/{{ organization.slug }}/documents" class="flex flex-col gap-4">
+      <div role="group" class="field">
+        <label for="doc-title">Title</label>
+        <input id="doc-title" type="text" name="title" required>
+      </div>
+      <div role="group" class="field">
+        <label for="doc-type">Type</label>
+        <input id="doc-type" type="text" name="document_type" required placeholder="e.g. NDA, MSA">
+      </div>
+      <div role="group" class="field">
+        <label for="doc-description">Description</label>
+        <input id="doc-description" type="text" name="description">
+      </div>
+      <div role="group" class="field">
+        <label for="doc-workflow">Workflow</label>
+        <select id="doc-workflow" name="workflow_definition_id" class="select w-full" required>
+          {% for wf in workflows %}<option value="{{ wf.id }}">{{ wf.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div role="group" class="field">
+        <label for="doc-actor">Your name</label>
+        <input id="doc-actor" type="text" name="actor" required>
+      </div>
+      <button type="submit" class="btn w-full">Create &amp; start workflow</button>
+    </form>
+    {% else %}
+    <p class="text-sm text-muted-foreground">
+      No active workflows yet —
+      <a class="underline" href="/{{ organization.slug }}/workflows">activate one first</a>.
+    </p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from app.domain.workflow.models import WorkflowDefinition
+
+
+class WorkflowDefinitionRepository(Protocol):
+    async def add(self, definition: WorkflowDefinition) -> None: ...
+
+    async def get(self, definition_id: int) -> WorkflowDefinition | None: ...
+
+    async def get_by_slug(self, organization_id: int, slug: str) -> WorkflowDefinition | None: ...
+
+    async def list_for_organization(self, organization_id: int) -> list[WorkflowDefinition]: ...

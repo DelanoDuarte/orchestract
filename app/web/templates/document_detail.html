@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{{ document.title }}{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">{{ document.title }}</h1>
+  <p class="text-sm text-muted-foreground">{{ document.description or "" }}</p>
+  <span class="badge mt-2" data-variant="secondary">{{ document.document_type }}</span>
+</div>
+
+{% if error %}
+<div class="alert mb-6" data-variant="destructive">
+  <section>{{ error }}</section>
+</div>
+{% endif %}
+
+<div class="card mb-6" data-size="sm">
+  <header><h2 class="text-sm font-medium text-muted-foreground">Lifecycle graph</h2></header>
+  <section>
+    <div class="step-pipeline">
+      {% for step in definition.steps %}
+      <div class="step-pill" data-current="{{ "true" if step.key == instance.current_step_key else "false" }}">
+        {{ icon(step_icon(step.key), 'size-5') }}
+        <span class="text-xs font-medium uppercase tracking-wide">{{ step.name }}</span>
+      </div>
+      {% if not loop.last %}<span class="step-arrow">{{ icon('arrow-right', 'size-4') }}</span>{% endif %}
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="card lg:col-span-2" data-size="sm">
+    <header>
+      <h2>Current step: {{ current_step_name }}</h2>
+      <p>Owned by {{ current_agent_name }}{% set current_step_description = definition.get_step(instance.current_step_key).description %}{% if current_step_description %} — {{ current_step_description }}{% endif %}</p>
+      <div class="card-action">
+        {% if instance.status.value == "active" %}
+        <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
+        {% else %}
+        <span class="badge" data-variant="secondary">Completed</span>
+        {% endif %}
+      </div>
+    </header>
+    <section>
+      {% if actions %}
+      <div class="flex flex-col gap-3">
+        {% for action in actions %}
+        <form method="post" action="/{{ organization.slug }}/documents/{{ document.id }}/transitions"
+              class="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
+          <input type="hidden" name="action_name" value="{{ action.action_name }}">
+          <div role="group" class="field min-w-[8rem] flex-1">
+            <label>Actor</label>
+            <input type="text" name="actor" required placeholder="Your name">
+          </div>
+          <div role="group" class="field min-w-[10rem] flex-1">
+            <label>Comment</label>
+            <input type="text" name="comment" placeholder="Optional">
+          </div>
+          <button type="submit" class="btn" data-variant="outline">
+            <span>{{ action.action_name }}</span>{{ icon('arrow-right', 'size-4') }}<span>{{ action.to_step_key }}</span>
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-muted-foreground">No further actions available — workflow complete.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="card" data-size="sm">
+    <header><h2>Versions</h2></header>
+    <div class="table-container">
+      <table class="table">
+        <thead><tr><th>#</th><th>Uploaded by</th><th>When</th></tr></thead>
+        <tbody>
+          {% for v in document.versions %}
+          <tr>
+            <td>v{{ v.version_no }}</td>
+            <td>{{ v.uploaded_by }}</td>
+            <td class="text-muted-foreground">{{ v.created_at.strftime("%Y-%m-%d") }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-center text-muted-foreground">None yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <footer>
+      <details class="w-full">
+        <summary class="cursor-pointer text-sm text-primary">{{ icon('upload', 'size-4 inline') }} Upload new version</summary>
+        <form method="post" action="/{{ organization.slug }}/documents/{{ document.id }}/versions" class="mt-3 flex flex-col gap-3">
+          <div role="group" class="field">
+            <label for="version-ref">Content reference</label>
+            <input id="version-ref" type="text" name="content_ref" required placeholder="path or URL">
+          </div>
+          <div role="group" class="field">
+            <label for="version-by">Uploaded by</label>
+            <input id="version-by" type="text" name="uploaded_by" required>
+          </div>
+          <div role="group" class="field">
+            <label for="version-notes">Notes</label>
+            <input id="version-notes" type="text" name="notes">
+          </div>
+          <button type="submit" class="btn w-full" data-size="sm">Upload version</button>
+        </form>
+      </details>
+    </footer>
+  </div>
+</div>
+
+<div class="card mt-6" data-size="sm">
+  <header><h2>History</h2></header>
+  <div class="table-container">
+    <table class="table">
+      <thead><tr><th>When</th><th>From</th><th>Action</th><th>To</th><th>Actor</th><th>Comment</th></tr></thead>
+      <tbody>
+        {% for entry in instance.history %}
+        <tr>
+          <td class="text-muted-foreground">{{ entry.occurred_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td>{{ entry.from_step_key or "—" }}</td>
+          <td>{{ entry.action_name or "started" }}</td>
+          <td>{{ entry.to_step_key }}</td>
+          <td>{{ entry.actor }}</td>
+          <td class="text-muted-foreground">{{ entry.comment or "" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from app.domain.tenancy.models import Organization
+
+
+class OrganizationRepository(Protocol):
+    async def add(self, organization: Organization) -> None: ...
+
+    async def get(self, organization_id: int) -> Organization | None: ...
+
+    async def get_by_slug(self, slug: str) -> Organization | None: ...
+
+    async def list(self) -> list[Organization]: ...

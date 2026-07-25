@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Documents{% endblock %}
+{% block content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight">Documents</h1>
+    <p class="text-sm text-muted-foreground">Every contract/document being orchestrated in this organization.</p>
+  </div>
+  <a href="/{{ organization.slug }}/documents/new" class="btn">
+    {{ icon('plus', 'size-4') }}<span>New document</span>
+  </a>
+</div>
+
+<div class="card" data-size="sm">
+  <div class="table-container">
+    <table class="table">
+      <thead>
+        <tr><th>Title</th><th>Type</th><th>Version</th><th>Updated</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for doc in documents %}
+        <tr>
+          <td class="font-medium">{{ doc.title }}</td>
+          <td>{{ doc.document_type }}</td>
+          <td>v{{ doc.current_version_no }}</td>
+          <td class="text-muted-foreground">{{ doc.updated_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td class="text-end">
+            <a href="/{{ organization.slug }}/documents/{{ doc.id }}" class="btn" data-variant="ghost" data-size="sm">
+              View{{ icon('chevron-right', 'size-4') }}
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted-foreground">No documents yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

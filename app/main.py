@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routers import agents, documents, organizations, workflows
+from app.api.routers import agents, documents, organizations, storage, workflows
 from app.domain.shared.exceptions import ConflictError, DomainError, NotFoundError
 from app.web.routes import org_router, root_router
 
@@ -28,6 +28,7 @@ app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
+app.include_router(storage.router, prefix="/api/v1")
 
 app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 app.include_router(root_router)

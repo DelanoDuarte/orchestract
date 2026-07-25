@@ -8,8 +8,15 @@ Run with: uv run python -m app.infrastructure.seed
 
 import asyncio
 
-from app.api.deps import agent_service, document_service, organization_service, workflow_service
+from app.api.deps import (
+    agent_service,
+    document_service,
+    organization_service,
+    storage_service,
+    workflow_service,
+)
 from app.domain.shared.exceptions import NotFoundError
+from app.domain.storage.models import StorageProvider
 
 ORG_NAME = "Acme Corp"
 
@@ -100,6 +107,25 @@ async def main() -> None:
         description="Sample contract to explore the workflow with.",
     )
     print(f"Created sample document: {document.title} (id={document.id})")
+
+    storage_connection = await storage_service.connect_bucket(
+        organization.id,
+        StorageProvider.LOCAL,
+        display_name="Local disk (dev)",
+        config={"prefix": organization.slug},
+        credentials={},
+    )
+    print(f"Connected storage backend: {storage_connection.display_name} ({storage_connection.provider.value})")
+
+    version = await document_service.upload_version(
+        document.id,
+        file_bytes=b"This is a placeholder contract body for the seeded demo document.\n",
+        filename="vendor-services-agreement-v1.txt",
+        content_type="text/plain",
+        uploaded_by="seed-script",
+        notes="Initial draft.",
+    )
+    print(f"Uploaded version {version.version_no} ({version.size_bytes} bytes) to {version.storage_key}")
     print(f"\nVisit http://127.0.0.1:8000/{organization.slug}/ once the server is running.")
 
 

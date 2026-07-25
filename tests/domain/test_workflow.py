@@ -140,8 +140,23 @@ def test_document_requires_non_empty_title():
 def test_document_add_version_increments_version_number():
     document = Document.create(organization_id=1, title="MSA", document_type="MSA")
     assert document.current_version_no == 0
-    v1 = document.add_version("s3://bucket/v1.pdf", uploaded_by="alice")
-    v2 = document.add_version("s3://bucket/v2.pdf", uploaded_by="bob", notes="fixed typo")
+    v1 = document.add_version(
+        storage_connection_id=1,
+        storage_key="org-1/doc-1/v1-msa.pdf",
+        original_filename="msa.pdf",
+        content_type="application/pdf",
+        size_bytes=1024,
+        uploaded_by="alice",
+    )
+    v2 = document.add_version(
+        storage_connection_id=1,
+        storage_key="org-1/doc-1/v2-msa.pdf",
+        original_filename="msa.pdf",
+        content_type="application/pdf",
+        size_bytes=2048,
+        uploaded_by="bob",
+        notes="fixed typo",
+    )
     assert v1.version_no == 1
     assert v2.version_no == 2
     assert document.current_version_no == 2

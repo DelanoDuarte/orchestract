@@ -58,6 +58,11 @@
                 {{ icon('users') }}<span>Agents</span>
               </a>
             </li>
+            <li>
+              <a href="/{{ organization.slug }}/settings/storage" {% if active_nav == "storage" %}aria-current="page"{% endif %}>
+                {{ icon('package') }}<span>Storage</span>
+              </a>
+            </li>
           </ul>
         </div>
       </section>

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Storage{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">Storage</h1>
+  <p class="text-sm text-muted-foreground">
+    Choose where document files actually live, and optionally connect a Google Drive or OneDrive
+    account to import files from as new document versions.
+  </p>
+</div>
+
+{% if error %}
+<div class="alert mb-6" data-variant="destructive">
+  <section>{{ error }}</section>
+</div>
+{% endif %}
+
+<div class="card mb-6" data-size="sm">
+  <header><h2>Connections</h2></header>
+  <div class="table-container">
+    <table class="table">
+      <thead><tr><th>Provider</th><th>Name</th><th>Status</th><th></th><th></th></tr></thead>
+      <tbody>
+        {% for conn in connections %}
+        <tr>
+          <td>{{ conn.provider.value }}</td>
+          <td class="font-medium">{{ conn.display_name }}</td>
+          <td>
+            {% if conn.status.value == "connected" %}
+            <span class="badge border-transparent bg-primary/15 text-primary">Connected</span>
+            {% elif conn.status.value == "error" %}
+            <span class="badge" data-variant="destructive">Error</span>
+            {% else %}
+            <span class="badge" data-variant="outline">{{ conn.status.value|title }}</span>
+            {% endif %}
+            {% if conn.is_primary %}<span class="badge" data-variant="secondary">Primary</span>{% endif %}
+          </td>
+          <td>
+            {% if conn.is_write_capable and not conn.is_primary and conn.status.value == "connected" %}
+            <form method="post" action="/{{ organization.slug }}/settings/storage/{{ conn.id }}/primary">
+              <button type="submit" class="btn" data-variant="outline" data-size="sm">Make primary</button>
+            </form>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <form method="post" action="/{{ organization.slug }}/settings/storage/{{ conn.id }}/disconnect">
+              <button type="submit" class="btn" data-variant="ghost" data-size="sm">Disconnect</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted-foreground">No storage connected yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-2">
+  <div class="card">
+    <header>
+      <h2>Connect a bucket</h2>
+      <p>The primary backend new document version bytes are written to.</p>
+    </header>
+    <section>
+      <form method="post" action="/{{ organization.slug }}/settings/storage/connect" class="flex flex-col gap-4" id="bucket-form">
+        <div role="group" class="field">
+          <label for="conn-provider">Provider</label>
+          <select id="conn-provider" name="provider" class="select w-full" onchange="updateBucketFormFields()">
+            <option value="local">Local disk (dev only)</option>
+            <option value="s3">Amazon S3</option>
+            <option value="minio">MinIO</option>
+            <option value="gcs">Google Cloud Storage</option>
+          </select>
+        </div>
+        <div role="group" class="field">
+          <label for="conn-name">Display name</label>
+          <input id="conn-name" type="text" name="display_name" required placeholder="e.g. Production bucket">
+        </div>
+        <div role="group" class="field" data-field="bucket">
+          <label for="conn-bucket">Bucket</label>
+          <input id="conn-bucket" type="text" name="bucket" placeholder="my-bucket">
+        </div>
+        <div role="group" class="field" data-field="region">
+          <label for="conn-region">Region</label>
+          <input id="conn-region" type="text" name="region" placeholder="us-east-1">
+        </div>
+        <div role="group" class="field" data-field="endpoint_url">
+          <label for="conn-endpoint">Endpoint URL</label>
+          <input id="conn-endpoint" type="text" name="endpoint_url" placeholder="https://minio.internal:9000">
+        </div>
+        <div role="group" class="field" data-field="access_key">
+          <label for="conn-access-key">Access key</label>
+          <input id="conn-access-key" type="text" name="access_key" autocomplete="off">
+        </div>
+        <div role="group" class="field" data-field="secret_key">
+          <label for="conn-secret-key">Secret key</label>
+          <input id="conn-secret-key" type="password" name="secret_key" autocomplete="off">
+        </div>
+        <div role="group" class="field" data-field="service_account_json">
+          <label for="conn-service-account">Service account JSON</label>
+          <textarea id="conn-service-account" name="service_account_json" class="textarea w-full" rows="4" placeholder="{...}"></textarea>
+        </div>
+        <button type="submit" class="btn w-full">Connect</button>
+      </form>
+      <script>
+        const FIELDS_BY_PROVIDER = {
+          local: [],
+          s3: ["bucket", "region", "access_key", "secret_key"],
+          minio: ["bucket", "endpoint_url", "access_key", "secret_key"],
+          gcs: ["bucket", "service_account_json"],
+        };
+        function updateBucketFormFields() {
+          const provider = document.getElementById("conn-provider").value;
+          const visible = FIELDS_BY_PROVIDER[provider] || [];
+          document.querySelectorAll("#bucket-form [data-field]").forEach((el) => {
+            el.style.display = visible.includes(el.dataset.field) ? "" : "none";
+          });
+        }
+        updateBucketFormFields();
+      </script>
+    </section>
+  </div>
+
+  <div class="card">
+    <header>
+      <h2>Connect a drive</h2>
+      <p>Read-only: files you pick are copied in as a new document version.</p>
+    </header>
+    <section class="flex flex-col gap-3">
+      {% for provider, label in oauth_provider_labels.items() %}
+      {% set configured = google_configured if provider.value == "google_drive" else microsoft_configured %}
+      {% if configured %}
+      <a href="/{{ organization.slug }}/settings/storage/connect/{{ provider.value }}/start" class="btn" data-variant="outline">
+        {{ icon('external-link', 'size-4') }}<span>Connect {{ label }}</span>
+      </a>
+      {% else %}
+      <button type="button" class="btn" data-variant="outline" disabled title="Not configured by the administrator">
+        {{ icon('external-link', 'size-4') }}<span>Connect {{ label }}</span>
+      </button>
+      <p class="text-xs text-muted-foreground">No OAuth app configured for {{ label }} yet.</p>
+      {% endif %}
+      {% endfor %}
+    </section>
+  </div>
+</div>
+{% endblock %}

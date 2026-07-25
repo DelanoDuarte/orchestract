@@ -3,6 +3,7 @@ from fastapi import Header
 from app.application.agent_service import AgentService
 from app.application.document_service import DocumentService
 from app.application.organization_service import OrganizationService
+from app.application.storage_service import StorageService
 from app.application.workflow_service import WorkflowService
 from app.domain.shared.exceptions import NotFoundError
 from app.domain.tenancy.models import Organization
@@ -17,7 +18,8 @@ def uow_factory() -> UnitOfWork:
 organization_service = OrganizationService(uow_factory)
 agent_service = AgentService(uow_factory)
 workflow_service = WorkflowService(uow_factory)
-document_service = DocumentService(uow_factory)
+storage_service = StorageService(uow_factory)
+document_service = DocumentService(uow_factory, storage_service)
 
 
 def get_organization_service() -> OrganizationService:
@@ -34,6 +36,10 @@ def get_workflow_service() -> WorkflowService:
 
 def get_document_service() -> DocumentService:
     return document_service
+
+
+def get_storage_service() -> StorageService:
+    return storage_service
 
 
 async def get_current_organization_from_header(

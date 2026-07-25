@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.domain.storage.models import ConnectionStatus, StorageProvider
 from app.domain.workflow.models import WorkflowStatus
 from app.domain.workflow_instances.models import InstanceStatus
 
@@ -108,8 +109,9 @@ class DocumentCreate(BaseModel):
     description: str | None = None
 
 
-class DocumentVersionCreate(BaseModel):
-    content_ref: str
+class DocumentVersionImport(BaseModel):
+    connection_id: int
+    external_file_id: str
     uploaded_by: str
     notes: str | None = None
 
@@ -119,7 +121,12 @@ class DocumentVersionOut(BaseModel):
 
     id: int
     version_no: int
-    content_ref: str
+    storage_key: str
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    source_provider: StorageProvider | None
+    source_external_id: str | None
     uploaded_by: str
     notes: str | None
     created_at: datetime
@@ -168,3 +175,35 @@ class WorkflowInstanceOut(BaseModel):
     started_at: datetime
     completed_at: datetime | None
     history: list[WorkflowHistoryEntryOut]
+
+
+class StorageConnectionCreate(BaseModel):
+    provider: StorageProvider
+    display_name: str
+    config: dict = {}
+    credentials: dict = {}
+
+
+class StorageConnectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    organization_id: int
+    provider: StorageProvider
+    status: ConnectionStatus
+    is_primary: bool
+    display_name: str
+    config: dict
+    created_at: datetime
+
+
+class OAuthStartOut(BaseModel):
+    authorization_url: str
+
+
+class ExternalFileOut(BaseModel):
+    id: str
+    name: str
+    mime_type: str
+    size: int | None
+    modified_at: datetime | None

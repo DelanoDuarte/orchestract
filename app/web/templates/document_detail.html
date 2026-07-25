@@ -72,13 +72,21 @@
     <header><h2>Versions</h2></header>
     <div class="table-container">
       <table class="table">
-        <thead><tr><th>#</th><th>Uploaded by</th><th>When</th></tr></thead>
+        <thead><tr><th>#</th><th>File</th><th>By</th></tr></thead>
         <tbody>
           {% for v in document.versions %}
           <tr>
             <td>v{{ v.version_no }}</td>
-            <td>{{ v.uploaded_by }}</td>
-            <td class="text-muted-foreground">{{ v.created_at.strftime("%Y-%m-%d") }}</td>
+            <td class="font-medium">
+              {{ v.original_filename }}
+              {% if v.source_provider %}
+              <span class="badge" data-variant="outline">{{ oauth_provider_labels.get(v.source_provider, v.source_provider.value) }}</span>
+              {% endif %}
+              <span class="block text-xs font-normal text-muted-foreground">
+                {{ "%.1f KB"|format(v.size_bytes / 1024) }} · {{ v.created_at.strftime("%Y-%m-%d") }}
+              </span>
+            </td>
+            <td class="text-muted-foreground">{{ v.uploaded_by }}</td>
           </tr>
           {% else %}
           <tr><td colspan="3" class="text-center text-muted-foreground">None yet.</td></tr>
@@ -86,13 +94,14 @@
         </tbody>
       </table>
     </div>
-    <footer>
+    <footer class="flex flex-col gap-3">
       <details class="w-full">
         <summary class="cursor-pointer text-sm text-primary">{{ icon('upload', 'size-4 inline') }} Upload new version</summary>
-        <form method="post" action="/{{ organization.slug }}/documents/{{ document.id }}/versions" class="mt-3 flex flex-col gap-3">
+        <form method="post" action="/{{ organization.slug }}/documents/{{ document.id }}/versions"
+              enctype="multipart/form-data" class="mt-3 flex flex-col gap-3">
           <div role="group" class="field">
-            <label for="version-ref">Content reference</label>
-            <input id="version-ref" type="text" name="content_ref" required placeholder="path or URL">
+            <label for="version-file">File</label>
+            <input id="version-file" type="file" name="file" required>
           </div>
           <div role="group" class="field">
             <label for="version-by">Uploaded by</label>
@@ -105,6 +114,11 @@
           <button type="submit" class="btn w-full" data-size="sm">Upload version</button>
         </form>
       </details>
+      {% for conn in drive_connections %}
+      <a href="/{{ organization.slug }}/documents/{{ document.id }}/import/{{ conn.id }}" class="btn" data-variant="outline" data-size="sm">
+        {{ icon('external-link', 'size-4') }}<span>Import from {{ conn.display_name }}</span>
+      </a>
+      {% endfor %}
     </footer>
   </div>
 </div>

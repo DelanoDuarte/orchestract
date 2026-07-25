@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, UploadFile
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.api.deps import (
@@ -8,12 +10,17 @@ from app.api.deps import (
     document_service,
     get_current_organization_from_path,
     organization_service,
+    storage_service,
     workflow_service,
 )
+from app.config import get_settings
 from app.domain.shared.exceptions import DomainError
+from app.domain.storage.models import StorageProvider
 from app.domain.tenancy.models import Organization
 from app.domain.workflow.models import WorkflowDefinition, WorkflowStatus
 from app.web.icons import icon, step_icon_name
+
+OAUTH_PROVIDER_LABELS = {StorageProvider.GOOGLE_DRIVE: "Google Drive", StorageProvider.ONEDRIVE: "OneDrive"}
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.globals["icon"] = icon
@@ -37,6 +44,13 @@ def _step_and_agent(definition: WorkflowDefinition, step_key: str, agent_names: 
 async def index(request: Request):
     organizations = await organization_service.list_organizations()
     return templates.TemplateResponse(request, "index.html", {"organizations": organizations})
+
+
+@root_router.get("/oauth/{provider}/callback")
+async def oauth_callback(provider: StorageProvider, request: Request, code: str, state: str):
+    connection = await storage_service.complete_oauth_connection(state, code)
+    organization = await organization_service.get(connection.organization_id)
+    return RedirectResponse(f"/{organization.slug}/settings/storage", status_code=303)
 
 
 @org_router.get("/")
@@ -111,6 +125,100 @@ async def toggle_agent(
     agent = await agent_service.get(agent_id)
     await agent_service.set_active(agent_id, not agent.is_active)
     return await agents_page(request, organization)
+
+
+async def _storage_settings_context(organization: Organization) -> dict:
+    connections = await storage_service.list_connections(organization.id)
+    return {
+        "organization": organization,
+        "connections": connections,
+        "oauth_provider_labels": OAUTH_PROVIDER_LABELS,
+        "google_configured": bool(get_settings().google_oauth_client_id),
+        "microsoft_configured": bool(get_settings().microsoft_oauth_client_id),
+        "active_nav": "storage",
+    }
+
+
+@org_router.get("/settings/storage")
+async def storage_settings_page(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+):
+    context = await _storage_settings_context(organization)
+    return templates.TemplateResponse(request, "storage_settings.html", context)
+
+
+@org_router.post("/settings/storage/connect")
+async def connect_bucket(
+    request: Request,
+    provider: StorageProvider = Form(...),
+    display_name: str = Form(...),
+    bucket: str = Form(""),
+    region: str = Form(""),
+    endpoint_url: str = Form(""),
+    access_key: str = Form(""),
+    secret_key: str = Form(""),
+    service_account_json: str = Form(""),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    config: dict = {}
+    credentials: dict = {}
+    if provider == StorageProvider.LOCAL:
+        config = {"prefix": organization.slug}
+    elif provider == StorageProvider.S3:
+        config = {"bucket": bucket, "region": region or None}
+        credentials = {"access_key": access_key, "secret_key": secret_key}
+    elif provider == StorageProvider.MINIO:
+        config = {"bucket": bucket, "endpoint_url": endpoint_url}
+        credentials = {"access_key": access_key, "secret_key": secret_key}
+    elif provider == StorageProvider.GCS:
+        config = {"bucket": bucket}
+        try:
+            credentials = {"service_account_info": json.loads(service_account_json)}
+        except ValueError:
+            context = await _storage_settings_context(organization)
+            context["error"] = "Service account JSON is not valid JSON."
+            return templates.TemplateResponse(request, "storage_settings.html", context, status_code=422)
+
+    try:
+        await storage_service.connect_bucket(organization.id, provider, display_name, config, credentials)
+    except DomainError as exc:
+        context = await _storage_settings_context(organization)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "storage_settings.html", context, status_code=422)
+    return await storage_settings_page(request, organization)
+
+
+@org_router.get("/settings/storage/connect/{provider}/start")
+async def start_oauth_connection(
+    provider: StorageProvider, organization: Organization = Depends(get_current_organization_from_path)
+):
+    url = await storage_service.start_oauth_connection(organization.id, provider)
+    return RedirectResponse(url, status_code=303)
+
+
+@org_router.post("/settings/storage/{connection_id}/primary")
+async def set_primary_connection(
+    connection_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        await storage_service.set_primary(connection_id)
+    except DomainError as exc:
+        context = await _storage_settings_context(organization)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "storage_settings.html", context, status_code=422)
+    return await storage_settings_page(request, organization)
+
+
+@org_router.post("/settings/storage/{connection_id}/disconnect")
+async def disconnect_connection(
+    connection_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    await storage_service.disconnect(connection_id)
+    return await storage_settings_page(request, organization)
 
 
 @org_router.get("/workflows")
@@ -297,6 +405,10 @@ async def _document_detail_context(organization: Organization, document_id: int)
     agent_names = await _agent_names(organization.id)
     step_name, agent_name = _step_and_agent(definition, instance.current_step_key, agent_names)
     actions = instance.available_actions(definition)
+    connections = await storage_service.list_connections(organization.id)
+    drive_connections = [
+        c for c in connections if c.provider in OAUTH_PROVIDER_LABELS and c.status.value == "connected"
+    ]
     return {
         "organization": organization,
         "document": document,
@@ -305,6 +417,8 @@ async def _document_detail_context(organization: Organization, document_id: int)
         "current_step_name": step_name,
         "current_agent_name": agent_name,
         "actions": actions,
+        "drive_connections": drive_connections,
+        "oauth_provider_labels": OAUTH_PROVIDER_LABELS,
         "active_nav": "documents",
     }
 
@@ -338,16 +452,69 @@ async def execute_transition(
 
 
 @org_router.post("/documents/{document_id}/versions")
-async def add_version(
+async def upload_version(
     document_id: int,
     request: Request,
-    content_ref: str = Form(...),
+    file: UploadFile,
     uploaded_by: str = Form(...),
     notes: str = Form(""),
     organization: Organization = Depends(get_current_organization_from_path),
 ):
     try:
-        await document_service.add_version(document_id, content_ref, uploaded_by, notes or None)
+        content = await file.read()
+        await document_service.upload_version(
+            document_id,
+            content,
+            file.filename or "file",
+            file.content_type or "application/octet-stream",
+            uploaded_by,
+            notes or None,
+        )
+    except DomainError as exc:
+        context = await _document_detail_context(organization, document_id)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "document_detail.html", context, status_code=422)
+    return await document_detail(document_id, request, organization)
+
+
+@org_router.get("/documents/{document_id}/import/{connection_id}")
+async def import_browser_page(
+    document_id: int,
+    connection_id: int,
+    request: Request,
+    folder_id: str | None = None,
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    document = await document_service.get(document_id)
+    connection = await storage_service.get(connection_id)
+    files = await storage_service.browse_external_files(connection_id, folder_id)
+    return templates.TemplateResponse(
+        request,
+        "document_import_browser.html",
+        {
+            "organization": organization,
+            "document": document,
+            "connection": connection,
+            "files": files,
+            "active_nav": "documents",
+        },
+    )
+
+
+@org_router.post("/documents/{document_id}/import/{connection_id}")
+async def import_version(
+    document_id: int,
+    connection_id: int,
+    request: Request,
+    external_file_id: str = Form(...),
+    uploaded_by: str = Form(...),
+    notes: str = Form(""),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        await document_service.import_version_from_external(
+            document_id, connection_id, external_file_id, uploaded_by, notes or None
+        )
     except DomainError as exc:
         context = await _document_detail_context(organization, document_id)
         context["error"] = str(exc)

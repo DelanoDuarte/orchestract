@@ -33,10 +33,11 @@ uv run pytest
 ## Layout
 
 - `app/domain/` — aggregates and rich domain models, one package per bounded context
-  (`tenancy`, `agents`, `workflow`, `workflow_instances`, `documents`), each with its own
-  `models.py`, `exceptions.py`, and `repository.py` (persistence port).
+  (`tenancy`, `agents`, `workflow`, `workflow_instances`, `documents`, `storage`), each with its
+  own `models.py`, `exceptions.py`, and `repository.py` (persistence port).
 - `app/infrastructure/db/` — SQLAlchemy session/engine, unit of work, and the repository
   implementations. `app/infrastructure/seed.py` is the demo data script.
+- `app/infrastructure/storage/` — the pluggable file-storage adapters (see below).
 - `app/application/` — use-case services that coordinate repositories + domain methods,
   including the ones that span more than one aggregate (e.g. creating a `Document` and starting
   its `WorkflowInstance` together).
@@ -67,3 +68,31 @@ step:
 Note: both CDN scripts are explicitly documented as dev/prototyping tools, not for production —
 swap them for a real Tailwind build + `basecoat-css` npm package (see their install docs) before
 shipping.
+
+## File storage
+
+Each organization configures its own `StorageConnection` (`/{org_slug}/settings/storage`):
+
+- **Write backends** — S3, Google Cloud Storage, or MinIO (S3-compatible; same adapter, just
+  pointed at a custom `endpoint_url`). Exactly one is the org's *primary* connection, which is
+  where new document version bytes get written (`app/infrastructure/storage/s3_compatible.py`,
+  `gcs.py`). A `local` provider (`local.py`) writes to `./storage/` on disk — dev/demo only, not
+  offered as a production choice, used so the seed script and tests have something real to
+  exercise without cloud credentials.
+- **Read-only import sources** — Google Drive and OneDrive, connected via OAuth2
+  (`google_drive.py`, `onedrive.py` — plain `httpx` calls, no SDK). Files picked from either are
+  **copied into the org's primary backend** at import time (`DocumentService.
+  import_version_from_external`), so a version stays retrievable even if the source file is later
+  deleted or access is revoked. These can never be the primary connection.
+
+Bucket credentials and OAuth tokens (`StorageCredential.secrets`) are encrypted at rest with
+Fernet (`app/domain/shared/encrypted_json.py`) using `ORCHESTRACT_STORAGE_ENCRYPTION_KEY`. If
+unset, an ephemeral key is generated per-process (logged as a warning) — fine for a single dev
+run, but set a persistent one (`.env` in this repo already has one for local dev) or every
+previously-stored secret becomes undecryptable on restart.
+
+Google Drive/OneDrive need a real registered OAuth app to actually authenticate —
+`ORCHESTRACT_GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` and `ORCHESTRACT_MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET`
+are empty by default, and the "Connect..." buttons render disabled until they're set. Redirect
+URIs to register: `{ORCHESTRACT_OAUTH_REDIRECT_BASE}/oauth/google-drive/callback` and
+`.../oauth/onedrive/callback`.

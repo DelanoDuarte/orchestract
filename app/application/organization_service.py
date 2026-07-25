@@ -20,6 +20,13 @@ class OrganizationService:
         async with self._uow_factory() as uow:
             return await uow.organizations.list()
 
+    async def get(self, organization_id: int) -> Organization:
+        async with self._uow_factory() as uow:
+            organization = await uow.organizations.get(organization_id)
+            if organization is None:
+                raise NotFoundError(f"organization {organization_id} not found")
+            return organization
+
     async def get_by_slug(self, slug: str) -> Organization:
         async with self._uow_factory() as uow:
             organization = await uow.organizations.get_by_slug(slug)

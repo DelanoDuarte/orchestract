@@ -7,10 +7,10 @@
 </div>
 
 {% if error %}
-<div class="alert mb-4" data-variant="destructive"><section>{{ error }}</section></div>
+<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
 {% endif %}
 
-<div class="card mx-auto max-w-lg">
+<div class="card mx-auto max-w-lg" data-size="sm">
   <section>
     {% if workflows %}
     <form method="post" action="/{{ organization.slug }}/documents" class="flex flex-col gap-4">

@@ -1,72 +1,56 @@
 {% extends "base.html" %}
 {% block title %}Agents{% endblock %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-semibold tracking-tight">Agents</h1>
-  <p class="text-sm text-muted-foreground">
-    Departments/participants that own steps in a workflow. Create as many as you need.
-  </p>
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight">Agents</h1>
+    <p class="text-sm text-muted-foreground">
+      Departments/participants that own steps in a workflow. Create as many as you need.
+    </p>
+  </div>
+  <a href="/{{ organization.slug }}/agents/new" class="btn">
+    {{ icon('plus', 'size-4') }}<span>New agent</span>
+  </a>
 </div>
 
 {% if error %}
-<div class="alert mb-4" data-variant="destructive">
+<div class="alert mb-6" data-variant="destructive">
   <section>{{ error }}</section>
 </div>
 {% endif %}
 
-<div class="grid gap-6 lg:grid-cols-3">
-  <div class="card lg:col-span-2" data-size="sm">
-    <div class="table-container">
-      <table class="table">
-        <thead>
-          <tr><th>Name</th><th>Description</th><th>Status</th><th></th></tr>
-        </thead>
-        <tbody>
-          {% for agent in agents %}
-          <tr>
-            <td class="font-medium">{{ agent.name }}</td>
-            <td class="text-muted-foreground">{{ agent.description or "" }}</td>
-            <td>
-              {% if agent.is_active %}
-              <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
-              {% else %}
-              <span class="badge" data-variant="outline">Inactive</span>
-              {% endif %}
-            </td>
-            <td class="text-end">
-              <form method="post" action="/{{ organization.slug }}/agents/{{ agent.id }}/toggle">
-                <button type="submit" class="btn" data-variant="outline" data-size="sm">
-                  {{ "Deactivate" if agent.is_active else "Activate" }}
-                </button>
-              </form>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" class="text-center text-muted-foreground">No agents yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card">
-    <header>
-      <h2>New agent</h2>
-      <p>e.g. Legal, Finance, Compliance.</p>
-    </header>
-    <section>
-      <form method="post" action="/{{ organization.slug }}/agents" class="form flex flex-col gap-4">
-        <div role="group" class="field">
-          <label for="agent-name">Name</label>
-          <input id="agent-name" type="text" name="name" required>
-        </div>
-        <div role="group" class="field">
-          <label for="agent-description">Description</label>
-          <input id="agent-description" type="text" name="description">
-        </div>
-        <button type="submit" class="btn w-full">Create agent</button>
-      </form>
-    </section>
+<div class="card" data-size="sm">
+  <div class="table-container">
+    <table class="table">
+      <thead>
+        <tr><th>Name</th><th>Description</th><th>Steps owned</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for agent in agents %}
+        <tr>
+          <td class="font-medium">{{ agent.name }}</td>
+          <td class="text-muted-foreground">{{ agent.description or "" }}</td>
+          <td class="text-muted-foreground">{{ steps_owned.get(agent.id, 0) }}</td>
+          <td>
+            {% if agent.is_active %}
+            <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
+            {% else %}
+            <span class="badge" data-variant="outline">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <form method="post" action="/{{ organization.slug }}/agents/{{ agent.id }}/toggle">
+              <button type="submit" class="btn" data-variant="outline" data-size="sm">
+                {{ "Deactivate" if agent.is_active else "Activate" }}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted-foreground">No agents yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 {% endblock %}

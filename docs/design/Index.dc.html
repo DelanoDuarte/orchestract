@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
+<script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
+<style>
+  :root{
+    --background: oklch(0.16 0.016 175); --foreground: oklch(0.95 0.01 175);
+    --card: oklch(0.205 0.018 175); --card-foreground: oklch(0.95 0.01 175);
+    --muted-foreground: oklch(0.66 0.02 175);
+    --border: oklch(1 0 0 / 10%); --primary: oklch(0.72 0.15 165);
+    --accent: oklch(0.78 0.14 70); --accent-foreground: oklch(0.2 0.03 70); --radius: 0.75rem;
+    --bg: var(--background); --fg: var(--foreground); --muted-fg: var(--muted-foreground);
+  }
+  body{ margin:0; background:var(--background); background-image:radial-gradient(circle at 12% -10%, oklch(0.4 0.06 165 / 20%), transparent 55%); background-attachment:fixed; }
+  a.org-row{ text-decoration:none; transition:border-color .15s,transform .15s; }
+  a.org-row:hover{ border-color:var(--accent) !important; transform:translateX(2px); }
+</style>
+</helmet>
+<div style="max-width:480px;margin:0 auto;padding:80px 24px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--fg);display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"></path></svg>
+    <h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.01em">Orchestract</h1>
+    <p style="margin:0;font-size:14px;color:var(--muted-fg)">Document &amp; contract workflow orchestrator.</p>
+  </div>
+
+  <div class="card">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border)">
+      <h2 style="margin:0;font-size:15px;font-weight:600">Organizations</h2>
+      <p style="margin:4px 0 0;font-size:12.5px;color:var(--muted-foreground)">Pick a tenant to manage its agents, workflows, and documents.</p>
+    </div>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+      <sc-if value="{{ hasOrgs }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ orgs }}" as="org" hint-placeholder-count="3">
+          <a href="#" class="org-row" style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--fg)">
+            <span style="font-size:13.5px;font-weight:500">{{ org.name }}</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14 M12 5l7 7-7 7"></path></svg>
+          </a>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{ noOrgs }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:8px 4px;font-size:13px;color:var(--muted-fg)">No organizations yet. Create one via the API: <code style="background:oklch(1 0 0 / 8%);padding:2px 6px;border-radius:5px;font-size:12px">POST /api/v1/organizations</code></p>
+      </sc-if>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{}, &quot;sampleState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;populated&quot;,&quot;tsType&quot;:&quot;'populated'|'empty'&quot;,&quot;options&quot;:[&quot;populated&quot;,&quot;empty&quot;],&quot;section&quot;:&quot;State&quot;}}">
+const ORGS = [
+  { name:"Northwind Holdings" },
+  { name:"Cascade Retail Group" },
+  { name:"Delta Supplies Co." }
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const sampleState = this.props.sampleState ?? "populated";
+    const orgs = sampleState === "empty" ? [] : ORGS;
+    return { hasOrgs: orgs.length > 0, noOrgs: orgs.length === 0, orgs };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
+<script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
+<style>
+  :root{
+    --background: oklch(0.16 0.016 175); --foreground: oklch(0.95 0.01 175);
+    --card: oklch(0.205 0.018 175); --card-foreground: oklch(0.95 0.01 175);
+    --muted: oklch(0.24 0.016 175); --muted-foreground: oklch(0.66 0.02 175);
+    --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 14%); --ring: oklch(0.72 0.15 165 / 0.5);
+    --primary: oklch(0.72 0.15 165); --primary-foreground: oklch(0.16 0.02 165);
+    --accent: oklch(0.78 0.14 70); --accent-foreground: oklch(0.2 0.03 70);
+    --secondary: oklch(0.24 0.016 175); --secondary-foreground: oklch(0.95 0.01 175);
+    --destructive: oklch(0.68 0.19 25); --destructive-foreground: oklch(0.98 0.01 25);
+    --radius: 0.75rem;
+    --bg: var(--background); --fg: var(--foreground); --card-fg: var(--card-foreground);
+    --muted-fg: var(--muted-foreground); --primary-fg: var(--primary-foreground);
+    --accent-fg: var(--accent-foreground); --destructive-fg: var(--destructive-foreground);
+  }
+  body{ margin:0; background:var(--background); background-image:radial-gradient(circle at 12% -10%, oklch(0.4 0.06 165 / 20%), transparent 55%); background-attachment:fixed; }
+  ::selection{ background:var(--primary); color:var(--primary-fg); }
+  .om-row{ transition:background-color .15s ease; }
+</style>
+</helmet>
+<div style="max-width:1180px;margin:0 auto;padding:40px 28px 80px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--fg);background:var(--bg)">
+
+  <div style="margin-bottom:24px">
+    <h1 style="margin:0;font-size:26px;font-weight:600;letter-spacing:-0.01em">{{ documentTitle }}</h1>
+    <p style="margin:6px 0 0;font-size:14px;color:var(--muted-fg)">{{ documentDescription }}</p>
+    <span style="display:inline-block;margin-top:10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;padding:3px 10px;border-radius:999px;background:var(--muted);color:var(--muted-fg);border:1px solid var(--border)">{{ documentType }}</span>
+  </div>
+
+  <!-- Jinja: {% if error %} -->
+  <sc-if value="{{ showError }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-bottom:24px;display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:var(--radius);border:1px solid oklch(0.5 0.15 25 / 0.4);background:oklch(0.62 0.19 25 / 0.12)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M9 9l6 6 M15 9l-6 6"></path></svg>
+      <span style="font-size:13px;color:var(--fg)">{{ errorText }}</span>
+    </div>
+  </sc-if>
+
+  <!-- Jinja: lifecycle graph card. DC enhancement: shows the workflow's full node graph with this document's traveled path highlighted, instead of a straight pipeline of steps. -->
+  <div class="card" style="margin-bottom:24px;padding:0">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted-fg)">Lifecycle graph</h2>
+      <div style="display:flex;align-items:center;gap:14px;font-size:11px;color:var(--muted-fg)">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;background:var(--accent)"></span>Traveled</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;border:2px solid var(--primary)"></span>Current</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;background:var(--muted);border:1px solid var(--border)"></span>Not yet reached</span>
+      </div>
+    </div>
+    <div style="padding:22px;position:relative;overflow-x:auto">
+      <div style="position:relative;width:{{ graphWidthPx }};height:{{ graphHeightPx }}">
+        <svg width="{{ graphWidth }}" height="{{ graphHeight }}" viewBox="0 0 {{ graphWidth }} {{ graphHeight }}" style="position:absolute;left:0;top:0;overflow:visible">
+          <defs>
+            <marker id="doc-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--muted-fg)"></path>
+            </marker>
+            <marker id="doc-arrow-traveled" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"></path>
+            </marker>
+          </defs>
+          <sc-for list="{{ graphEdges }}" as="edge" hint-placeholder-count="8">
+            <path d="{{ edge.d }}" fill="none" stroke="{{ edge.stroke }}" stroke-width="{{ edge.strokeWidth }}" stroke-dasharray="{{ edge.dash }}" marker-end="{{ edge.markerUrl }}"></path>
+          </sc-for>
+        </svg>
+        <sc-for list="{{ graphNodes }}" as="node" hint-placeholder-count="8">
+          <div style="position:absolute;left:{{ node.xPx }};top:{{ node.yPx }};width:{{ node.wPx }};height:{{ node.hPx }};border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;padding:6px;background:{{ node.bg }};border:{{ node.border }};box-shadow:{{ node.shadow }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ node.iconColor }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ node.iconD }}"></path></svg>
+            <span style="font-size:11.5px;font-weight:600;color:{{ node.textColor }}">{{ node.name }}</span>
+            <span style="font-size:10px;color:var(--muted-fg)">{{ node.agentName }}</span>
+            <sc-if value="{{ node.isCurrent }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:1px 6px;border-radius:999px;background:var(--primary);color:var(--primary-fg);margin-top:2px">Here</span>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;gap:24px;grid-template-columns:2fr 1fr">
+    <div class="card" style="grid-column:span 2;padding:0">
+      <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <h2 style="margin:0;font-size:15px;font-weight:600">Current step: {{ currentStepName }}</h2>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--muted-fg)">Owned by {{ currentAgentName }}<sc-if value="{{ hasStepDescription }}" hint-placeholder-val="{{ true }}"> — {{ currentStepDescription }}</sc-if></p>
+        </div>
+        <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;padding:3px 10px;border-radius:999px;white-space:nowrap;background:{{ statusBg }};color:{{ statusFg }};border:1px solid {{ statusBorder }}">{{ statusLabel }}</span>
+      </div>
+      <div style="padding:18px">
+        <sc-if value="{{ hasActions }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ actionRows }}" as="action" hint-placeholder-count="2">
+              <form onsubmit="{{ preventSubmit }}" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;border-radius:9px;border:1px solid var(--border);padding:12px">
+                <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:130px">
+                  <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Actor</label>
+                  <input type="text" placeholder="Your name" style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px">
+                  <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Comment</label>
+                  <input type="text" placeholder="Optional" style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+                </div>
+                <button type="submit" class="btn" data-variant="outline" style="gap:6px;white-space:nowrap">
+                  <span>{{ action.actionName }}</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14 M12 5l7 7-7 7"></path></svg>
+                  <span style="color:var(--muted-fg)">{{ action.toStepKey }}</span>
+                </button>
+              </form>
+            </sc-for>
+          </div>
+        </sc-if>
+<sc-if value="{{ noActions }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 0;color:var(--muted-fg)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+            <p style="margin:0;font-size:13px">No further actions available — workflow complete.</p>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;gap:24px;grid-template-columns:2fr 1fr;margin-top:24px">
+    <div class="card" style="padding:0">
+      <div style="padding:16px 18px;border-bottom:1px solid var(--border)">
+        <h2 style="margin:0;font-size:15px;font-weight:600">Versions</h2>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="table" style="width:100%;font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">#</th>
+              <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Uploaded by</th>
+              <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">When</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ versionRows }}" as="v" hint-placeholder-count="3">
+              <tr class="om-row" style="background:{{ v.rowBg }}" style-hover="background:var(--muted)">
+                <td style="font-weight:500">v{{ v.versionNo }}</td>
+                <td>{{ v.uploadedBy }}</td>
+                <td style="color:var(--muted-fg)">{{ v.createdAt }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:14px 18px;border-top:1px solid var(--border)">
+        <details style="width:100%">
+          <summary style="cursor:pointer;font-size:13px;color:var(--primary);display:flex;align-items:center;gap:6px;list-style:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 8l5-5 5 5 M12 3v12"></path></svg>
+            Upload new version
+          </summary>
+          <form onsubmit="{{ preventSubmit }}" style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Content reference</label>
+              <input type="text" placeholder="path or URL" style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Uploaded by</label>
+              <input type="text" style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Notes</label>
+              <input type="text" style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+            </div>
+            <button type="submit" style="width:100%;background:var(--primary);color:var(--primary-fg);border:none;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">Upload version</button>
+          </form>
+        </details>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:12px;height:fit-content">
+      <h2 style="margin:0;font-size:15px;font-weight:600">At a glance</h2>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px">
+          <span style="color:var(--muted-fg)">Steps traveled</span><span style="font-weight:600">{{ stepsTraveled }} of {{ totalSteps }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px">
+          <span style="color:var(--muted-fg)">Versions</span><span style="font-weight:600">{{ versionCount }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px">
+          <span style="color:var(--muted-fg)">Started</span><span style="font-weight:600">{{ startedAt }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:24px;padding:0">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border)">
+      <h2 style="margin:0;font-size:15px;font-weight:600">History</h2>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="table" style="width:100%;font-size:13px">
+        <thead>
+          <tr>
+            <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">When</th>
+            <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">From</th>
+            <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Action</th>
+            <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">To</th>
+            <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Actor</th>
+            <th style="text-align:left;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Comment</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ historyRows }}" as="entry" hint-placeholder-count="5">
+            <tr class="om-row" style="background:{{ entry.rowBg }}" style-hover="background:var(--muted)">
+              <td style="color:var(--muted-fg);white-space:nowrap">{{ entry.occurredAt }}</td>
+              <td><code style="font-size:11.5px;background:var(--muted);padding:2px 6px;border-radius:5px">{{ entry.fromStepKey }}</code></td>
+              <td>{{ entry.actionName }}</td>
+              <td><code style="font-size:11.5px;background:var(--muted);padding:2px 6px;border-radius:5px">{{ entry.toStepKey }}</code></td>
+              <td>{{ entry.actor }}</td>
+              <td style="color:var(--muted-fg)">{{ entry.comment }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{}, &quot;currentStepKey&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;active&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;draft&quot;,&quot;legal_review&quot;,&quot;negotiation&quot;,&quot;approval&quot;,&quot;signature&quot;,&quot;active&quot;,&quot;renewal&quot;,&quot;archived&quot;],&quot;section&quot;:&quot;State&quot;}, &quot;instanceStatus&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;active&quot;,&quot;tsType&quot;:&quot;'active'|'completed'&quot;,&quot;options&quot;:[&quot;active&quot;,&quot;completed&quot;],&quot;section&quot;:&quot;State&quot;}, &quot;showTraveledPath&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Lifecycle graph&quot;}, &quot;errorBanner&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;State&quot;}}">
+const STEP_ICONS = {
+  draft: "M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M14 3v4h4 M8 13h6 M8 17h6",
+  legal_review: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0",
+  negotiation: "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1 M17 8a3 3 0 0 1 0 6 M21 20v-1a5 5 0 0 0-3.2-4.7",
+  approval: "M9 12l2 2 4-4 M3.8 8.6a3.6 3.6 0 0 1 4.3-4.3 3.6 3.6 0 0 1 6 0 3.6 3.6 0 0 1 4.3 4.3 3.6 3.6 0 0 1 0 6 3.6 3.6 0 0 1-4.3 4.3 3.6 3.6 0 0 1-6 0 3.6 3.6 0 0 1-4.3-4.3 3.6 3.6 0 0 1 0-6z",
+  signature: "M12 20h9 M16.4 3.6a1.4 1.4 0 0 1 2 2L7.4 16.6l-3 1 1-3z",
+  active: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M10 8l6 4-6 4z",
+  renewal: "M17 2l4 4-4 4 M3 11v-1a4 4 0 0 1 4-4h14 M7 22l-4-4 4-4 M21 13v1a4 4 0 0 1-4 4H3",
+  archived: "M2 4h20v5H2z M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9 M10 13h4"
+};
+
+const STEPS = [
+  { key:"draft", name:"Draft", agentName:"Legal", description:"Legal drafts the initial contract text.", col:0, row:0 },
+  { key:"legal_review", name:"Legal Review", agentName:"Legal", description:"Legal reviews terms for risk and compliance.", col:1, row:0 },
+  { key:"negotiation", name:"Negotiation", agentName:"Counterparty", description:"Terms are negotiated with the counterparty.", col:2, row:0 },
+  { key:"approval", name:"Approval", agentName:"Finance", description:"Finance signs off on commercial terms.", col:2, row:1 },
+  { key:"signature", name:"Signature", agentName:"Signatories", description:"Authorized signatories execute the contract.", col:3, row:0 },
+  { key:"active", name:"Active", agentName:"Contract Ops", description:"Contract is in force and being monitored.", col:4, row:0 },
+  { key:"renewal", name:"Renewal", agentName:"Contract Ops", description:"Terms are revisited ahead of expiry.", col:4, row:1 },
+  { key:"archived", name:"Archived", agentName:"Contract Ops", description:"Contract is closed out and stored.", col:5, row:0 }
+];
+
+const TRANSITIONS = [
+  { from:"draft", to:"legal_review", action:"submit_for_review" },
+  { from:"legal_review", to:"negotiation", action:"needs_changes" },
+  { from:"legal_review", to:"approval", action:"approve" },
+  { from:"negotiation", to:"draft", action:"reject" },
+  { from:"negotiation", to:"legal_review", action:"resubmit" },
+  { from:"approval", to:"signature", action:"approve" },
+  { from:"approval", to:"draft", action:"request_changes" },
+  { from:"signature", to:"active", action:"fully_executed" },
+  { from:"active", to:"renewal", action:"initiate_renewal" },
+  { from:"active", to:"archived", action:"terminate" },
+  { from:"renewal", to:"negotiation", action:"renegotiate" },
+  { from:"renewal", to:"signature", action:"re_sign" }
+];
+
+const HISTORY = [
+  { fromStepKey:"\u2014", actionName:"started", toStepKey:"draft", actor:"Priya Shah", comment:"", occurredAt:"2026-06-02 09:14" },
+  { fromStepKey:"draft", actionName:"submit_for_review", toStepKey:"legal_review", actor:"Priya Shah", comment:"First pass ready.", occurredAt:"2026-06-03 11:02" },
+  { fromStepKey:"legal_review", actionName:"needs_changes", toStepKey:"negotiation", actor:"Marcus Lee", comment:"Liability cap too low.", occurredAt:"2026-06-05 15:41" },
+  { fromStepKey:"negotiation", actionName:"resubmit", toStepKey:"legal_review", actor:"Dana Kim", comment:"Cap revised to 2x fees.", occurredAt:"2026-06-09 10:20" },
+  { fromStepKey:"legal_review", actionName:"approve", toStepKey:"approval", actor:"Marcus Lee", comment:"", occurredAt:"2026-06-10 08:55" },
+  { fromStepKey:"approval", actionName:"approve", toStepKey:"signature", actor:"Alicia Novak", comment:"Budget confirmed.", occurredAt:"2026-06-12 13:30" },
+  { fromStepKey:"signature", actionName:"fully_executed", toStepKey:"active", actor:"Dana Kim", comment:"Countersigned by both parties.", occurredAt:"2026-06-15 17:05" }
+];
+
+const VERSIONS = [
+  { versionNo:1, uploadedBy:"Priya Shah", createdAt:"2026-06-02" },
+  { versionNo:2, uploadedBy:"Dana Kim", createdAt:"2026-06-09" },
+  { versionNo:3, uploadedBy:"Alicia Novak", createdAt:"2026-06-12" }
+];
+
+const ACTIONS = [
+  { actionName:"initiate_renewal", toStepKey:"renewal" },
+  { actionName:"terminate", toStepKey:"archived" }
+];
+
+function computeGraph(steps, transitions) {
+  const NODE_W = 176, NODE_H = 68, COL_GAP = 96, ROW_GAP = 64, PAD = 48;
+  const maxCol = Math.max(...steps.map(s => s.col));
+  const maxRow = Math.max(...steps.map(s => s.row));
+  const nodeByKey = {};
+  const nodes = steps.map(s => {
+    const x = PAD + s.col * (NODE_W + COL_GAP);
+    const y = PAD + s.row * (NODE_H + ROW_GAP);
+    const n = { ...s, x, y, w: NODE_W, h: NODE_H, cx: x + NODE_W / 2, cy: y + NODE_H / 2, portBottomY: y + NODE_H };
+    nodeByKey[s.key] = n;
+    return n;
+  });
+  const baseHeight = PAD * 2 + (maxRow + 1) * NODE_H + maxRow * ROW_GAP;
+  const baseWidth = PAD * 2 + (maxCol + 1) * NODE_W + maxCol * COL_GAP;
+  let laneCount = 0;
+  const edges = transitions.map(t => {
+    const from = nodeByKey[t.from], to = nodeByKey[t.to];
+    const isLoop = to.col <= from.col;
+    let d, labelX, labelY;
+    if (!isLoop) {
+      const x1 = from.x + from.w, y1 = from.cy, x2 = to.x, y2 = to.cy;
+      const mx = (x1 + x2) / 2;
+      d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+      labelX = mx; labelY = (y1 + y2) / 2 - 10;
+    } else {
+      laneCount++;
+      const laneY = baseHeight + 24 + (laneCount - 1) * 30;
+      const x1 = from.cx, y1 = from.portBottomY, x2 = to.cx, y2 = to.portBottomY;
+      d = `M ${x1} ${y1} C ${x1} ${laneY}, ${x1} ${laneY}, ${x1} ${laneY} L ${x2} ${laneY} C ${x2} ${laneY}, ${x2} ${laneY}, ${x2} ${y2}`;
+      labelX = (x1 + x2) / 2; labelY = laneY - 8;
+    }
+    return { ...t, d, isLoop, labelX, labelY };
+  });
+  const height = baseHeight + (laneCount ? 24 + laneCount * 30 + 24 : 24);
+  return { nodes, edges, width: baseWidth, height };
+}
+
+class Component extends DCLogic {
+  preventSubmit(e) { e.preventDefault(); }
+
+  renderVals() {
+    const currentStepKey = this.props.currentStepKey ?? "active";
+    const status = this.props.instanceStatus ?? (currentStepKey === "archived" ? "completed" : "active");
+    const showTraveledPath = this.props.showTraveledPath ?? true;
+    const showError = this.props.errorBanner ?? false;
+
+    const zebra = (i) => i % 2 === 1 ? "var(--muted)" : "transparent";
+
+    const traveledStepKeys = new Set(["draft"]);
+    const traveledEdgeKeys = new Set();
+    HISTORY.forEach(h => {
+      traveledStepKeys.add(h.toStepKey);
+      if (h.fromStepKey !== "\u2014") traveledEdgeKeys.add(`${h.fromStepKey}>${h.actionName}>${h.toStepKey}`);
+    });
+
+    const graph = computeGraph(STEPS, TRANSITIONS);
+    const stepByKey = {}; STEPS.forEach(s => stepByKey[s.key] = s);
+    const currentStep = stepByKey[currentStepKey];
+
+    const graphNodes = graph.nodes.map(n => {
+      const isCurrent = n.key === currentStepKey;
+      const isTraveled = showTraveledPath && traveledStepKeys.has(n.key);
+      return {
+        ...n,
+        xPx: n.x + "px", yPx: n.y + "px", wPx: n.w + "px", hPx: n.h + "px",
+        iconD: STEP_ICONS[n.key],
+        isCurrent,
+        bg: isCurrent ? "oklch(0.78 0.15 80 / 0.16)" : isTraveled ? "oklch(0.62 0.09 190 / 0.14)" : "var(--muted)",
+        border: isCurrent ? "2px solid var(--primary)" : isTraveled ? "1px solid oklch(0.62 0.09 190 / 0.5)" : "1px dashed var(--border)",
+        shadow: isCurrent ? "0 0 0 4px oklch(0.78 0.15 80 / 0.12)" : "none",
+        iconColor: isCurrent ? "var(--primary)" : isTraveled ? "var(--accent)" : "var(--muted-fg)",
+        textColor: isTraveled || isCurrent ? "var(--fg)" : "var(--muted-fg)"
+      };
+    });
+
+    const graphEdges = graph.edges.map(e => {
+      const isTraveled = showTraveledPath && traveledEdgeKeys.has(`${e.from}>${e.action}>${e.to}`);
+      return {
+        ...e,
+        stroke: isTraveled ? "var(--accent)" : e.isLoop ? "oklch(0.64 0.02 200 / 0.5)" : "oklch(0.64 0.02 200 / 0.5)",
+        strokeWidth: isTraveled ? "2.5" : "1.25",
+        dash: isTraveled ? "0" : e.isLoop ? "5,4" : "0",
+        markerUrl: isTraveled ? "url(#doc-arrow-traveled)" : "url(#doc-arrow)",
+        labelX: e.labelX + "px", labelY: e.labelY + "px"
+      };
+    });
+
+    const actionRows = ACTIONS.map(a => ({ actionName: a.actionName, toStepKey: a.toStepKey }));
+    const historyRows = HISTORY.map((h, i) => ({ ...h, rowBg: zebra(i) }));
+    const versionRows = VERSIONS.map((v, i) => ({ ...v, rowBg: zebra(i) }));
+
+    const statusMap = {
+      active: { label: "Active", bg: "oklch(0.78 0.15 80 / 0.16)", fg: "var(--primary)", border: "oklch(0.78 0.15 80 / 0.35)" },
+      completed: { label: "Completed", bg: "var(--muted)", fg: "var(--muted-fg)", border: "var(--border)" }
+    };
+    const s = statusMap[status] ?? statusMap.active;
+    const hasActions = status === "active" && actionRows.length > 0;
+
+    return {
+      documentTitle: "MSA \u2014 Northwind Logistics",
+      documentDescription: "Master services agreement covering fulfillment operations, renewed annually.",
+      documentType: "Master Services Agreement",
+      showError, errorText: "That action couldn't be completed \u2014 please check the required fields.",
+      graphWidth: graph.width, graphHeight: graph.height,
+      graphWidthPx: graph.width + "px", graphHeightPx: graph.height + "px",
+      graphNodes, graphEdges,
+      currentStepName: currentStep.name, currentAgentName: currentStep.agentName,
+      currentStepDescription: currentStep.description, hasStepDescription: !!currentStep.description,
+      statusLabel: s.label, statusBg: s.bg, statusFg: s.fg, statusBorder: s.border,
+      hasActions, noActions: !hasActions, actionRows,
+      versionRows, historyRows,
+      stepsTraveled: traveledStepKeys.size, totalSteps: STEPS.length,
+      versionCount: VERSIONS.length, startedAt: "2026-06-02",
+      preventSubmit: this.preventSubmit
+    };
+  }
+}
+
+</script>
+</body>
+</html>

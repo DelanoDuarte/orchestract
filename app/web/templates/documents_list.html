@@ -11,6 +11,24 @@
   </a>
 </div>
 
+<div class="mb-4 flex flex-wrap items-center gap-2.5">
+  <form method="get" class="relative min-w-56 flex-1">
+    {% if active_type %}<input type="hidden" name="doc_type" value="{{ active_type }}">{% endif %}
+    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-muted-foreground">
+      {{ icon('search', 'size-3.5') }}
+    </span>
+    <input type="search" name="q" value="{{ search_query }}" placeholder="Search documents..." class="input pl-8">
+  </form>
+  <a href="/{{ organization.slug }}/documents{{ "?q=" ~ search_query if search_query else "" }}"
+     class="badge {{ "border-transparent bg-primary/15 text-primary" if not active_type else "" }}"
+     {% if active_type %}data-variant="outline"{% endif %}>All</a>
+  {% for t in doc_types %}
+  <a href="/{{ organization.slug }}/documents?doc_type={{ t }}{{ "&q=" ~ search_query if search_query else "" }}"
+     class="badge {{ "border-transparent bg-primary/15 text-primary" if active_type == t else "" }}"
+     {% if active_type != t %}data-variant="outline"{% endif %}>{{ t }}</a>
+  {% endfor %}
+</div>
+
 <div class="card" data-size="sm">
   <div class="table-container">
     <table class="table">

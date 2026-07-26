@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
+<script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
+<style>
+  :root{
+    --background: oklch(0.16 0.016 175); --foreground: oklch(0.95 0.01 175);
+    --card: oklch(0.205 0.018 175); --card-foreground: oklch(0.95 0.01 175);
+    --muted: oklch(0.24 0.016 175); --muted-foreground: oklch(0.66 0.02 175);
+    --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 14%); --ring: oklch(0.72 0.15 165 / 0.5);
+    --primary: oklch(0.72 0.15 165); --primary-foreground: oklch(0.16 0.02 165);
+    --accent: oklch(0.78 0.14 70); --accent-foreground: oklch(0.2 0.03 70);
+    --secondary: oklch(0.24 0.016 175); --secondary-foreground: oklch(0.95 0.01 175);
+    --destructive: oklch(0.62 0.19 25); --destructive-foreground: oklch(0.97 0.01 25);
+    --radius: 0.75rem;
+    --bg: var(--background); --fg: var(--foreground); --muted-fg: var(--muted-foreground);
+    --primary-fg: var(--primary-foreground); --accent-fg: var(--accent-foreground);
+  }
+  body{ margin:0; background:var(--background); background-image:radial-gradient(circle at 12% -10%, oklch(0.4 0.06 165 / 20%), transparent 55%); background-attachment:fixed; }
+  .om-row{ transition:background-color .15s ease; position:relative; }
+  .om-row td:first-child{ position:relative; }
+</style>
+</helmet>
+<div style="max-width:1180px;margin:0 auto;padding:40px 28px 80px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--fg)">
+  <div style="margin-bottom:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+    <div>
+      <h1 style="margin:0;font-size:26px;font-weight:600;letter-spacing:-0.01em">{{ orgName }}</h1>
+      <p style="margin:6px 0 0;font-size:14px;color:var(--muted-foreground)">Documents currently moving through a workflow.</p>
+    </div>
+    <a href="#" class="btn" style="gap:6px;transition:transform .15s ease, box-shadow .15s ease" style-hover="transform:translateY(-1px);box-shadow:0 6px 16px oklch(0 0 0 / 25%)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14 M12 5v14"></path></svg>New document
+    </a>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
+    <sc-for list="{{ statCards }}" as="stat" hint-placeholder-count="3">
+      <div class="card" style="padding:16px 18px;transition:border-color .15s ease" style-hover="border-color:var(--primary)">
+        <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted-foreground)">{{ stat.label }}</p>
+        <p style="margin:6px 0 0;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums">{{ stat.value }}</p>
+      </div>
+    </sc-for>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <h2 style="margin:0;font-size:15px;font-weight:600">In progress</h2>
+      <span style="font-size:12px;color:var(--muted-foreground)">{{ rowCount }} documents</span>
+    </div>
+    <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+      <div style="overflow-x:auto">
+        <table class="table" style="width:100%;font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Title</th>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Type</th>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Current step</th>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Owner</th>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ docRows }}" as="row" hint-placeholder-count="6">
+              <tr class="om-row" style="background:{{ row.rowBg }}" style-hover="background:var(--muted)">
+                <td style="font-weight:500;border-left:2px solid transparent">{{ row.title }}</td>
+                <td style="color:var(--muted-foreground)">{{ row.docType }}</td>
+                <td>
+                  <span style="display:inline-flex;align-items:center;gap:7px">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ row.stepIconD }}"></path></svg>
+                    {{ row.stepName }}
+                  </span>
+                </td>
+                <td>{{ row.agentName }}</td>
+                <td>
+                  <span class="badge" style="background:{{ row.statusBg }};color:{{ row.statusFg }};border-color:transparent">{{ row.statusLabel }}</span>
+                </td>
+                <td style="text-align:right">
+                  <a href="#" style="display:inline-flex;align-items:center;gap:4px;color:var(--foreground);text-decoration:none;font-size:12.5px;font-weight:500;transition:gap .15s ease" style-hover="gap:7px;color:var(--primary)">View<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg></a>
+                </td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </sc-if>
+    <sc-if value="{{ noRows }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:44px 0;color:var(--muted-foreground)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M14 3v4h4"></path></svg>
+        <p style="margin:0;font-size:13px">No documents yet.</p>
+      </div>
+    </sc-if>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const ROWS = [
+  { title:"MSA — Northwind Logistics", docType:"MSA", stepKey:"legal_review", stepName:"Legal Review", agentName:"Legal", status:"active" },
+  { title:"NDA — Cascade Retail", docType:"NDA", stepKey:"signature", stepName:"Signature", agentName:"Signatories", status:"active" },
+  { title:"Procurement — Delta Supplies", docType:"Procurement", stepKey:"negotiation", stepName:"Negotiation", agentName:"Counterparty", status:"active" },
+  { title:"MSA — Harbor Freight", docType:"MSA", stepKey:"approval", stepName:"Approval", agentName:"Finance", status:"active" },
+  { title:"Renewal — Northwind Logistics", docType:"MSA", stepKey:"renewal", stepName:"Renewal", agentName:"Contract Ops", status:"active" },
+  { title:"NDA — Bright Ventures", docType:"NDA", stepKey:"archived", stepName:"Archived", agentName:"Contract Ops", status:"completed" }
+];
+const STEP_ICONS = {
+  legal_review:"M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0",
+  signature:"M12 20h9 M16.4 3.6a1.4 1.4 0 0 1 2 2L7.4 16.6l-3 1 1-3z",
+  negotiation:"M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1",
+  approval:"M9 12l2 2 4-4 M3.8 8.6a3.6 3.6 0 0 1 4.3-4.3 3.6 3.6 0 0 1 6 0",
+  renewal:"M17 2l4 4-4 4 M3 11v-1a4 4 0 0 1 4-4h14 M7 22l-4-4 4-4 M21 13v1a4 4 0 0 1-4 4H3",
+  archived:"M2 4h20v5H2z M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"
+};
+
+class Component extends DCLogic {
+  renderVals() {
+    const sampleState = this.props.sampleState ?? "populated";
+    const rows = sampleState === "empty" ? [] : ROWS;
+    const zebra = (i) => i % 2 === 1 ? "oklch(1 0 0 / 3%)" : "transparent";
+    const active = rows.filter(r => r.status === "active").length;
+    const docRows = rows.map((r, i) => ({
+      ...r, rowBg: zebra(i), stepIconD: STEP_ICONS[r.stepKey],
+      statusLabel: r.status === "active" ? "Active" : "Completed",
+      statusBg: r.status === "active" ? "oklch(0.72 0.15 165 / 0.16)" : "var(--muted)",
+      statusFg: r.status === "active" ? "var(--primary)" : "var(--muted-foreground)"
+    }));
+    return {
+      orgName: this.props.orgName ?? "Northwind Holdings",
+      statCards: [
+        { label:"In progress", value: String(active) },
+        { label:"Completed", value: String(rows.length - active) },
+        { label:"Total documents", value: String(rows.length) }
+      ],
+      hasRows: rows.length > 0, noRows: rows.length === 0, rowCount: rows.length,
+      docRows
+    };
+  }
+}
+
+</script>
+</body>
+</html>

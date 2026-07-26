@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
+<script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
+<style>
+  :root{
+    --background: oklch(0.16 0.016 175); --foreground: oklch(0.95 0.01 175);
+    --card: oklch(0.205 0.018 175); --card-foreground: oklch(0.95 0.01 175);
+    --muted: oklch(0.24 0.016 175); --muted-foreground: oklch(0.66 0.02 175);
+    --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 14%); --ring: oklch(0.72 0.15 165 / 0.5);
+    --primary: oklch(0.72 0.15 165); --primary-foreground: oklch(0.16 0.02 165);
+    --accent: oklch(0.78 0.14 70); --accent-foreground: oklch(0.2 0.03 70);
+    --secondary: oklch(0.24 0.016 175); --secondary-foreground: oklch(0.95 0.01 175);
+    --destructive: oklch(0.62 0.19 25); --destructive-foreground: oklch(0.97 0.01 25);
+    --radius: 0.75rem;
+    --bg: var(--background); --fg: var(--foreground); --muted-fg: var(--muted-foreground);
+    --primary-fg: var(--primary-foreground);
+  }
+  body{ margin:0; background:var(--background); background-image:radial-gradient(circle at 12% -10%, oklch(0.4 0.06 165 / 20%), transparent 55%); background-attachment:fixed; }
+  input[type="search"]::placeholder{ color:var(--muted-foreground); }
+  .om-row{ transition:background-color .15s ease; }
+</style>
+</helmet>
+<div style="max-width:1180px;margin:0 auto;padding:40px 28px 80px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--fg)">
+  <div style="margin-bottom:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+    <div>
+      <h1 style="margin:0;font-size:26px;font-weight:600;letter-spacing:-0.01em">Documents</h1>
+      <p style="margin:6px 0 0;font-size:14px;color:var(--muted-fg)">Every contract/document being orchestrated in this organization.</p>
+    </div>
+    <a href="#" class="btn" style="gap:6px;transition:transform .15s ease, box-shadow .15s ease" style-hover="transform:translateY(-1px);box-shadow:0 6px 16px oklch(0 0 0 / 25%)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14 M12 5v14"></path></svg>New document
+    </a>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px">
+    <div style="position:relative;flex:1;min-width:220px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="2" stroke-linecap="round" style="position:absolute;left:11px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <input type="search" placeholder="Search documents..." style="width:100%;box-sizing:border-box;background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 12px 8px 32px;color:var(--fg);font-size:13px"></input>
+    </div>
+    <sc-for list="{{ typeFilters }}" as="t" hint-placeholder-count="3">
+      <span class="badge" style="border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.fg }};white-space:nowrap">{{ t.label }}</span>
+    </sc-for>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <sc-if value="{{ hasDocs }}" hint-placeholder-val="{{ true }}">
+      <div style="overflow-x:auto">
+        <table class="table" style="width:100%;font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Title</th>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Type</th>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Version</th>
+              <th style="text-align:left;color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Updated</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ docRows }}" as="doc" hint-placeholder-count="7">
+              <tr class="om-row" style="background:{{ doc.rowBg }}" style-hover="background:var(--muted)">
+                <td style="font-weight:500">{{ doc.title }}</td>
+                <td style="color:var(--muted-foreground)">{{ doc.docType }}</td>
+                <td><code style="font-size:11.5px;background:var(--muted);padding:2px 6px;border-radius:5px">v{{ doc.versionNo }}</code></td>
+                <td style="color:var(--muted-foreground);white-space:nowrap">{{ doc.updatedAt }}</td>
+                <td style="text-align:right">
+                  <a href="#" style="display:inline-flex;align-items:center;gap:4px;color:var(--foreground);text-decoration:none;font-size:12.5px;font-weight:500;transition:gap .15s ease" style-hover="gap:7px;color:var(--primary)">View<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg></a>
+                </td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </sc-if>
+    <sc-if value="{{ noDocs }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:44px 0;color:var(--muted-fg)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M14 3v4h4"></path></svg>
+        <p style="margin:0;font-size:13px">No documents yet.</p>
+      </div>
+    </sc-if>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{}, &quot;sampleState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;populated&quot;,&quot;tsType&quot;:&quot;'populated'|'empty'&quot;,&quot;options&quot;:[&quot;populated&quot;,&quot;empty&quot;],&quot;section&quot;:&quot;State&quot;}}">
+const DOCS = [
+  { title:"MSA — Northwind Logistics", docType:"MSA", versionNo:3, updatedAt:"2026-06-15 17:05" },
+  { title:"NDA — Cascade Retail", docType:"NDA", versionNo:1, updatedAt:"2026-06-14 09:22" },
+  { title:"Procurement — Delta Supplies", docType:"Procurement", versionNo:2, updatedAt:"2026-06-12 14:10" },
+  { title:"MSA — Harbor Freight", docType:"MSA", versionNo:1, updatedAt:"2026-06-10 11:40" },
+  { title:"Renewal — Northwind Logistics", docType:"MSA", versionNo:1, updatedAt:"2026-06-08 08:55" },
+  { title:"NDA — Bright Ventures", docType:"NDA", versionNo:2, updatedAt:"2026-06-01 16:03" },
+  { title:"Procurement — Alta Foods", docType:"Procurement", versionNo:1, updatedAt:"2026-05-28 10:15" }
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const sampleState = this.props.sampleState ?? "populated";
+    const docs = sampleState === "empty" ? [] : DOCS;
+    const zebra = (i) => i % 2 === 1 ? "oklch(1 0 0 / 3%)" : "transparent";
+    return {
+      hasDocs: docs.length > 0, noDocs: docs.length === 0,
+      typeFilters: [
+        { label:"MSA", bg:"oklch(0.72 0.15 165 / 0.14)", fg:"var(--primary)", border:"oklch(0.72 0.15 165 / 0.4)" },
+        { label:"NDA", bg:"transparent", fg:"var(--muted-fg)", border:"var(--border)" },
+        { label:"Procurement", bg:"transparent", fg:"var(--muted-fg)", border:"var(--border)" }
+      ],
+      docRows: docs.map((d, i) => ({ ...d, rowBg: zebra(i) }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

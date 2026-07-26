@@ -77,11 +77,26 @@ async def dashboard(
                 "status": instance.status.value,
             }
         )
+    active_count = sum(1 for row in rows if row["status"] == "active")
+    stats = [
+        {"label": "In progress", "value": active_count},
+        {"label": "Completed", "value": len(rows) - active_count},
+        {"label": "Total documents", "value": len(rows)},
+    ]
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {"organization": organization, "rows": rows, "active_nav": "dashboard"},
+        {"organization": organization, "rows": rows, "stats": stats, "active_nav": "dashboard"},
     )
+
+
+async def _steps_owned_by_agent(organization_id: int) -> dict[int, int]:
+    definitions = await workflow_service.list_for_organization(organization_id)
+    counts: dict[int, int] = {}
+    for definition in definitions:
+        for step in definition.steps:
+            counts[step.agent_id] = counts.get(step.agent_id, 0) + 1
+    return counts
 
 
 @org_router.get("/agents")
@@ -89,10 +104,22 @@ async def agents_page(
     request: Request, organization: Organization = Depends(get_current_organization_from_path)
 ):
     agents = await agent_service.list_agents(organization.id)
+    steps_owned = await _steps_owned_by_agent(organization.id)
     return templates.TemplateResponse(
         request,
         "agents.html",
-        {"organization": organization, "agents": agents, "active_nav": "agents"},
+        {"organization": organization, "agents": agents, "steps_owned": steps_owned, "active_nav": "agents"},
+    )
+
+
+@org_router.get("/agents/new")
+async def new_agent_page(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+):
+    return templates.TemplateResponse(
+        request,
+        "agent_new.html",
+        {"organization": organization, "active_nav": "agents"},
     )
 
 
@@ -106,11 +133,14 @@ async def create_agent(
     try:
         await agent_service.create_agent(organization.id, name, description or None)
     except DomainError as exc:
-        agents = await agent_service.list_agents(organization.id)
         return templates.TemplateResponse(
             request,
-            "agents.html",
-            {"organization": organization, "agents": agents, "active_nav": "agents", "error": str(exc)},
+            "agent_new.html",
+            {
+                "organization": organization,
+                "active_nav": "agents",
+                "error": str(exc),
+            },
             status_code=422,
         )
     return await agents_page(request, organization)
@@ -233,6 +263,17 @@ async def workflows_page(
     )
 
 
+@org_router.get("/workflows/new")
+async def new_workflow_page(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+):
+    return templates.TemplateResponse(
+        request,
+        "workflow_new.html",
+        {"organization": organization, "active_nav": "workflows"},
+    )
+
+
 @org_router.post("/workflows")
 async def create_workflow(
     request: Request,
@@ -243,13 +284,11 @@ async def create_workflow(
     try:
         await workflow_service.create_definition(organization.id, name, description or None)
     except DomainError as exc:
-        workflows = await workflow_service.list_for_organization(organization.id)
         return templates.TemplateResponse(
             request,
-            "workflows_list.html",
+            "workflow_new.html",
             {
                 "organization": organization,
-                "workflows": workflows,
                 "active_nav": "workflows",
                 "error": str(exc),
             },
@@ -344,13 +383,30 @@ async def activate_workflow(
 
 @org_router.get("/documents")
 async def documents_page(
-    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+    q: str = "",
+    doc_type: str = "",
 ):
-    documents = await document_service.list_for_organization(organization.id)
+    all_documents = await document_service.list_for_organization(organization.id)
+    doc_types = sorted({document.document_type for document in all_documents})
+    documents = all_documents
+    if q:
+        needle = q.lower()
+        documents = [d for d in documents if needle in d.title.lower()]
+    if doc_type:
+        documents = [d for d in documents if d.document_type == doc_type]
     return templates.TemplateResponse(
         request,
         "documents_list.html",
-        {"organization": organization, "documents": documents, "active_nav": "documents"},
+        {
+            "organization": organization,
+            "documents": documents,
+            "doc_types": doc_types,
+            "search_query": q,
+            "active_type": doc_type,
+            "active_nav": "documents",
+        },
     )
 
 
@@ -409,6 +465,7 @@ async def _document_detail_context(organization: Organization, document_id: int)
     drive_connections = [
         c for c in connections if c.provider in OAUTH_PROVIDER_LABELS and c.status.value == "connected"
     ]
+    steps_traveled = len({entry.to_step_key for entry in instance.history})
     return {
         "organization": organization,
         "document": document,
@@ -419,6 +476,8 @@ async def _document_detail_context(organization: Organization, document_id: int)
         "actions": actions,
         "drive_connections": drive_connections,
         "oauth_provider_labels": OAUTH_PROVIDER_LABELS,
+        "steps_traveled": steps_traveled,
+        "total_steps": len(definition.steps),
         "active_nav": "documents",
     }
 

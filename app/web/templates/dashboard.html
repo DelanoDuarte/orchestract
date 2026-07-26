@@ -11,7 +11,22 @@
   </a>
 </div>
 
+<div class="mb-6 grid gap-3.5 sm:grid-cols-3">
+  {% for stat in stats %}
+  <div class="card" data-size="sm">
+    <p class="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">{{ stat.label }}</p>
+    <p class="mt-1.5 text-2xl font-bold tabular-nums">{{ stat.value }}</p>
+  </div>
+  {% endfor %}
+</div>
+
 <div class="card" data-size="sm">
+  <header>
+    <h2>In progress</h2>
+    <div class="card-action">
+      <span class="text-xs text-muted-foreground">{{ rows|length }} documents</span>
+    </div>
+  </header>
   <div class="table-container">
     <table class="table">
       <thead>

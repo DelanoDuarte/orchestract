@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}New agent{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">New agent</h1>
+  <p class="text-sm text-muted-foreground">e.g. Legal, Finance, Compliance.</p>
+</div>
+
+{% if error %}
+<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+{% endif %}
+
+<div class="card mx-auto max-w-lg" data-size="sm">
+  <section>
+    <form method="post" action="/{{ organization.slug }}/agents" class="flex flex-col gap-4">
+      <div role="group" class="field">
+        <label for="agent-name">Name</label>
+        <input id="agent-name" type="text" name="name" required>
+      </div>
+      <div role="group" class="field">
+        <label for="agent-description">Description</label>
+        <input id="agent-description" type="text" name="description">
+      </div>
+      <button type="submit" class="btn w-full">Create agent</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

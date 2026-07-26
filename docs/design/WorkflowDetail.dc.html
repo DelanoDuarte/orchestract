@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
+<script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
+<style>
+  :root{
+    --background: oklch(0.16 0.016 175); --foreground: oklch(0.95 0.01 175);
+    --card: oklch(0.205 0.018 175); --card-foreground: oklch(0.95 0.01 175);
+    --muted: oklch(0.24 0.016 175); --muted-foreground: oklch(0.66 0.02 175);
+    --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 14%); --ring: oklch(0.72 0.15 165 / 0.5);
+    --primary: oklch(0.72 0.15 165); --primary-foreground: oklch(0.16 0.02 165);
+    --accent: oklch(0.78 0.14 70); --accent-foreground: oklch(0.2 0.03 70);
+    --secondary: oklch(0.24 0.016 175); --secondary-foreground: oklch(0.95 0.01 175);
+    --destructive: oklch(0.68 0.19 25); --destructive-foreground: oklch(0.98 0.01 25);
+    --radius: 0.75rem;
+    --bg: var(--background); --fg: var(--foreground); --card-fg: var(--card-foreground);
+    --muted-fg: var(--muted-foreground); --primary-fg: var(--primary-foreground);
+    --accent-fg: var(--accent-foreground); --destructive-fg: var(--destructive-foreground);
+  }
+  body{ margin:0; background:var(--background); background-image:radial-gradient(circle at 12% -10%, oklch(0.4 0.06 165 / 20%), transparent 55%); background-attachment:fixed; }
+  ::selection{ background:var(--primary); color:var(--primary-fg); }
+  .om-row{ transition:background-color .15s ease; }
+</style>
+</helmet>
+<div style="max-width:1180px;margin:0 auto;padding:40px 28px 80px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--fg);background:var(--bg)">
+
+  <div style="margin-bottom:24px;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px">
+    <div>
+      <h1 style="margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:26px;font-weight:600;letter-spacing:-0.01em">
+        {{ workflowName }}
+        <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;padding:3px 10px;border-radius:999px;background:{{ statusBadgeBg }};color:{{ statusBadgeFg }};border:1px solid {{ statusBadgeBorder }}">{{ statusLabel }}</span>
+      </h1>
+      <p style="margin:6px 0 0;font-size:14px;color:var(--muted-fg)">{{ workflowDescription }}</p>
+    </div>
+  </div>
+
+  <!-- Jinja: {% if error %} -->
+  <sc-if value="{{ showError }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-bottom:24px;display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:var(--radius);border:1px solid oklch(0.5 0.15 25 / 0.4);background:oklch(0.62 0.19 25 / 0.12)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M9 9l6 6 M15 9l-6 6"/></svg>
+      <span style="font-size:13px;color:var(--fg)">{{ errorText }}</span>
+    </div>
+  </sc-if>
+
+  <!-- Jinja: {% if workflow.status.value == "draft" %} how-it-works alert -->
+  <sc-if value="{{ isDraft }}" hint-placeholder-val="{{ true }}">
+    <div style="margin-bottom:24px;padding:16px 18px;border-radius:var(--radius);border:1px solid var(--border);background:var(--card)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg>
+        <h2 style="margin:0;font-size:14px;font-weight:600">How a workflow works</h2>
+      </div>
+      <p style="margin:0;font-size:13px;line-height:1.6;color:var(--muted-fg)">
+        A workflow is a graph of <strong style="color:var(--fg)">steps</strong>, each owned by an <strong style="color:var(--fg)">agent</strong>. One step is the <strong style="color:var(--fg)">start</strong> and at least one is an <strong style="color:var(--fg)">end</strong>. <strong style="color:var(--fg)">Transitions</strong> are named actions that move a document between steps — including branches and loops back to earlier steps.
+      </p>
+    </div>
+  </sc-if>
+
+  <!-- Jinja: lifecycle graph card. DC enhancement: renders an actual node graph (branches + loop-backs) instead of a straight pipeline; the classic linear view is still available via the "graphView" tweak. -->
+  <div class="card" style="margin-bottom:24px;padding:0">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <h2 style="margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted-fg)">Lifecycle graph</h2>
+    </div>
+    <div style="padding:22px">
+      <sc-if value="{{ hasSteps }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ isGraphView }}" hint-placeholder-val="{{ true }}">
+          <div style="position:relative;overflow-x:auto">
+            <div style="position:relative;width:{{ graphWidthPx }};height:{{ graphHeightPx }}">
+              <svg width="{{ graphWidth }}" height="{{ graphHeight }}" viewBox="0 0 {{ graphWidth }} {{ graphHeight }}" style="position:absolute;left:0;top:0;overflow:visible">
+                <defs>
+                  <marker id="wf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path d="M0 0 L10 5 L0 10 z" fill="var(--muted-fg)"></path>
+                  </marker>
+                  <marker id="wf-arrow-loop" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path d="M0 0 L10 5 L0 10 z" fill="var(--primary)"></path>
+                  </marker>
+                </defs>
+                <sc-for list="{{ graphEdges }}" as="edge" hint-placeholder-count="6">
+                  <path d="{{ edge.d }}" fill="none" stroke="{{ edge.stroke }}" stroke-width="{{ edge.strokeWidth }}" stroke-dasharray="{{ edge.dash }}" marker-end="{{ edge.markerUrl }}"></path>
+                </sc-for>
+              </svg>
+              <sc-for list="{{ graphEdges }}" as="edge" hint-placeholder-count="6">
+                <div style="position:absolute;left:{{ edge.labelX }};top:{{ edge.labelY }};transform:translate(-50%,-50%);font-size:10px;font-weight:500;white-space:nowrap;padding:2px 7px;border-radius:999px;pointer-events:none">
+                  <span style="background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:2px 7px;color:{{ edge.labelColor }}">{{ edge.action }}</span>
+                </div>
+              </sc-for>
+              <sc-for list="{{ graphNodes }}" as="node" hint-placeholder-count="6">
+                <div style="position:absolute;left:{{ node.xPx }};top:{{ node.yPx }};width:{{ node.wPx }};height:{{ node.hPx }};border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;padding:6px;background:{{ node.bg }};border:{{ node.border }}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ node.iconColor }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ node.iconD }}"></path></svg>
+                  <span style="font-size:11.5px;font-weight:600;color:{{ node.textColor }}">{{ node.name }}</span>
+                  <span style="font-size:10px;color:var(--muted-fg)">{{ node.agentName }}</span>
+                  <sc-if value="{{ node.badgeLabel }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;padding:1px 6px;border-radius:999px;background:var(--muted);color:var(--muted-fg);margin-top:2px">{{ node.badgeLabel }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isPipelineView }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+            <sc-for list="{{ pipelineSteps }}" as="step" hint-placeholder-count="6">
+              <div style="display:contents">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;border-radius:10px;background:var(--muted);border:1px solid var(--border);min-width:100px">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ step.iconD }}"></path></svg>
+                  <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em">{{ step.name }}</span>
+                  <span style="font-size:9.5px;color:var(--muted-fg)">{{ step.agentName }}</span>
+                </div>
+                <sc-if value="{{ step.hasNext }}" hint-placeholder-val="{{ true }}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14 M12 5l7 7-7 7"></path></svg>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </sc-if>
+      <sc-if value="{{ noSteps }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:36px 0;color:var(--muted-fg)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"></path></svg>
+          <p style="margin:0;font-size:13px">Add your first step below to see the graph here.</p>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+
+    <!-- Jinja: Steps card -->
+    <div class="card" style="padding:0">
+      <div style="padding:16px 18px;border-bottom:1px solid var(--border)">
+        <h2 style="margin:0;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600">
+          <span style="width:20px;height:20px;border-radius:999px;background:oklch(0.78 0.15 80 / 0.16);color:var(--primary);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">1</span>
+          Steps
+        </h2>
+        <p style="margin:4px 0 0;font-size:13px;color:var(--muted-fg)">Who's involved, and what happens at each stage of the process.</p>
+      </div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:20px">
+        <sc-if value="{{ hasSteps }}" hint-placeholder-val="{{ true }}">
+          <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:9px 12px;font-weight:600;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Step</th>
+                  <th style="text-align:left;padding:9px 12px;font-weight:600;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">What happens</th>
+                  <th style="text-align:left;padding:9px 12px;font-weight:600;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Agent</th>
+                  <th style="text-align:right;padding:9px 12px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ stepRows }}" as="step" hint-placeholder-count="4">
+                  <tr class="om-row" style="background:{{ step.rowBg }};border-top:1px solid var(--border)" style-hover="background:var(--muted)">
+                    <td style="padding:9px 12px;font-weight:500">
+                      <span style="display:inline-flex;align-items:center;gap:7px">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ step.iconD }}"></path></svg>
+                        {{ step.name }}
+                      </span>
+                    </td>
+                    <td style="padding:9px 12px;color:var(--muted-fg)">{{ step.description }}</td>
+                    <td style="padding:9px 12px">{{ step.agentName }}</td>
+                    <td style="padding:9px 12px;text-align:right;white-space:nowrap">
+                      <sc-if value="{{ step.isInitial }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size:10px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--muted);color:var(--muted-fg);margin-left:4px">Start</span>
+                      </sc-if>
+                      <sc-if value="{{ step.isTerminal }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size:10px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted-fg);margin-left:4px">End</span>
+                      </sc-if>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noSteps }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 0;border:1px dashed var(--border);border-radius:8px;color:var(--muted-fg)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M14 3v4h4"></path></svg>
+            <p style="margin:0;font-size:13px">No steps yet — add one below.</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDraft }}" hint-placeholder-val="{{ true }}">
+          <form onsubmit="{{ preventSubmit }}" style="display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--border);padding-top:20px">
+            <h3 style="margin:0;font-size:13px;font-weight:600">Add a step</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Name</label>
+                <input type="text" placeholder="e.g. Draft" style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Key</label>
+                <input type="text" placeholder="e.g. draft" style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+                <p style="margin:0;font-size:11px;color:var(--muted-fg)">A short, unique id used internally to wire up transitions.</p>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">What happens here?</label>
+              <input type="text" placeholder="e.g. Legal drafts the initial contract text." style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Owned by</label>
+              <select style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px">
+                <sc-for list="{{ agentOptions }}" as="agent" hint-placeholder-count="4">
+                  <option value="{{ agent.id }}">{{ agent.name }}</option>
+                </sc-for>
+              </select>
+              <p style="margin:0;font-size:11px;color:var(--muted-fg)">The agent responsible for acting while a document is on this step.</p>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox"></input>This is the start step</label>
+                <p style="margin:4px 0 0;font-size:11px;color:var(--muted-fg)">New documents begin here. Only one step can be the start.</p>
+              </div>
+              <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox"></input>This is an end step</label>
+                <p style="margin:4px 0 0;font-size:11px;color:var(--muted-fg)">The workflow completes when a document reaches here.</p>
+              </div>
+            </div>
+            <button type="submit" class="btn" style="align-self:flex-start;gap:6px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14 M12 5v14"></path></svg>
+              Add step
+            </button>
+          </form>
+        </sc-if>
+        <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:12px;color:var(--muted-fg);display:flex;align-items:center;gap:6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg>
+            This workflow is live — steps are locked.
+          </p>
+        </sc-if>
+      </div>
+    </div>
+
+    <!-- Jinja: Transitions card -->
+    <div class="card" style="padding:0">
+      <div style="padding:16px 18px;border-bottom:1px solid var(--border)">
+        <h2 style="margin:0;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600">
+          <span style="width:20px;height:20px;border-radius:999px;background:oklch(0.78 0.15 80 / 0.16);color:var(--primary);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">2</span>
+          Transitions
+        </h2>
+        <p style="margin:4px 0 0;font-size:13px;color:var(--muted-fg)">How a document moves from one step to another.</p>
+      </div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:20px">
+        <sc-if value="{{ hasTransitions }}" hint-placeholder-val="{{ true }}">
+          <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:9px 12px;font-weight:600;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">From</th>
+                  <th></th>
+                  <th style="text-align:left;padding:9px 12px;font-weight:600;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">When this happens</th>
+                  <th></th>
+                  <th style="text-align:left;padding:9px 12px;font-weight:600;color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:0.03em">Goes to</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ transitionRows }}" as="t" hint-placeholder-count="5">
+                  <tr class="om-row" style="background:{{ t.rowBg }};border-top:1px solid var(--border)" style-hover="background:var(--muted)">
+                    <td style="padding:9px 12px"><code style="font-size:11.5px;background:var(--muted);padding:2px 6px;border-radius:5px">{{ t.from }}</code></td>
+                    <td style="padding:9px 6px;color:var(--muted-fg)">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14 M12 5l7 7-7 7"></path></svg>
+                    </td>
+                    <td style="padding:9px 12px">
+                      {{ t.action }}
+                      <sc-if value="{{ t.hasDescription }}" hint-placeholder-val="{{ false }}">
+                        <span style="display:block;font-size:11px;color:var(--muted-fg)">{{ t.description }}</span>
+                      </sc-if>
+                    </td>
+                    <td style="padding:9px 6px;color:var(--muted-fg)">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14 M12 5l7 7-7 7"></path></svg>
+                    </td>
+                    <td style="padding:9px 12px"><code style="font-size:11.5px;background:var(--muted);padding:2px 6px;border-radius:5px">{{ t.to }}</code></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noTransitions }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 0;border:1px dashed var(--border);border-radius:8px;color:var(--muted-fg)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14 M12 5l7 7-7 7"></path></svg>
+            <p style="margin:0;font-size:13px">No transitions yet.</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ showTransitionForm }}" hint-placeholder-val="{{ true }}">
+          <form onsubmit="{{ preventSubmit }}" style="display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--border);padding-top:20px">
+            <h3 style="margin:0;font-size:13px;font-weight:600">Add a transition</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">From step</label>
+                <select style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px">
+                  <sc-for list="{{ stepOptions }}" as="step" hint-placeholder-count="4"><option value="{{ step.key }}">{{ step.name }}</option></sc-for>
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Goes to</label>
+                <select style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px">
+                  <sc-for list="{{ stepOptions }}" as="step" hint-placeholder-count="4"><option value="{{ step.key }}">{{ step.name }}</option></sc-for>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Action name</label>
+              <input type="text" placeholder="e.g. approve" style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+              <p style="margin:0;font-size:11px;color:var(--muted-fg)">Shown to users as the button that triggers this move.</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;font-weight:500;color:var(--muted-fg)">Description (optional)</label>
+              <input type="text" placeholder="e.g. Legal signs off on the terms." style="background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--fg);font-size:13px"></input>
+            </div>
+            <button type="submit" class="btn" style="align-self:flex-start;gap:6px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14 M12 5v14"></path></svg>
+              Add transition
+            </button>
+          </form>
+        </sc-if>
+        <sc-if value="{{ needsMoreSteps }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:13px;color:var(--muted-fg);border-top:1px solid var(--border);padding-top:20px">Add at least two steps above before wiring transitions between them.</p>
+        </sc-if>
+        <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:12px;color:var(--muted-fg);display:flex;align-items:center;gap:6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted-fg)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg>
+            This workflow is live — transitions are locked.
+          </p>
+        </sc-if>
+      </div>
+    </div>
+
+    <!-- Jinja: Activate card -->
+    <sc-if value="{{ isDraft }}" hint-placeholder-val="{{ true }}">
+      <div class="card" style="padding:0">
+        <div style="padding:16px 18px;border-bottom:1px solid var(--border)">
+          <h2 style="margin:0;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600">
+            <span style="width:20px;height:20px;border-radius:999px;background:oklch(0.78 0.15 80 / 0.16);color:var(--primary);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">3</span>
+            Activate
+          </h2>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--muted-fg)">Locks the graph so documents can start running through it.</p>
+        </div>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:16px">
+          <sc-if value="{{ hasIssues }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:14px 16px;border-radius:8px;border:1px solid oklch(0.5 0.15 25 / 0.4);background:oklch(0.62 0.19 25 / 0.12)">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><path d="m15 9-6 6 M9 9l6 6"></path></svg>
+                <h2 style="margin:0;font-size:13px;font-weight:600">Not ready yet</h2>
+              </div>
+              <ul style="margin:0;padding-left:18px;font-size:12.5px;color:var(--muted-fg);display:flex;flex-direction:column;gap:2px">
+                <sc-for list="{{ issueList }}" as="issue" hint-placeholder-count="2"><li>{{ issue }}</li></sc-for>
+              </ul>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noIssues }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:14px 16px;border-radius:8px;border:1px solid var(--border);background:var(--muted)">
+              <div style="display:flex;align-items:center;gap:8px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                <h2 style="margin:0;font-size:13px;font-weight:600">Ready to activate</h2>
+              </div>
+              <section style="margin:4px 0 0 23px;font-size:12.5px;color:var(--muted-fg)">Every step is reachable from the start, and an end step is defined.</section>
+            </div>
+          </sc-if>
+          <form onsubmit="{{ preventSubmit }}">
+            <button type="submit" class="btn" disabled="{{ hasIssues }}" style="gap:6px;opacity:{{ activateOpacity }}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg>
+              Activate workflow
+            </button>
+          </form>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{}, &quot;status&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;draft&quot;,&quot;tsType&quot;:&quot;'draft'|'active'|'retired'&quot;,&quot;options&quot;:[&quot;draft&quot;,&quot;active&quot;,&quot;retired&quot;],&quot;section&quot;:&quot;State&quot;}, &quot;graphView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;graph&quot;,&quot;tsType&quot;:&quot;'graph'|'pipeline'&quot;,&quot;options&quot;:[&quot;graph&quot;,&quot;pipeline&quot;],&quot;section&quot;:&quot;Lifecycle graph&quot;}, &quot;sampleState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;populated&quot;,&quot;tsType&quot;:&quot;'populated'|'empty'&quot;,&quot;options&quot;:[&quot;populated&quot;,&quot;empty&quot;],&quot;section&quot;:&quot;State&quot;}, &quot;errorBanner&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;State&quot;}, &quot;readyToActivate&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;State&quot;}}">
+const STEP_ICONS = {
+  draft: "M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M14 3v4h4 M8 13h6 M8 17h6",
+  legal_review: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0",
+  negotiation: "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1 M17 8a3 3 0 0 1 0 6 M21 20v-1a5 5 0 0 0-3.2-4.7",
+  approval: "M9 12l2 2 4-4 M3.8 8.6a3.6 3.6 0 0 1 4.3-4.3 3.6 3.6 0 0 1 6 0 3.6 3.6 0 0 1 4.3 4.3 3.6 3.6 0 0 1 0 6 3.6 3.6 0 0 1-4.3 4.3 3.6 3.6 0 0 1-6 0 3.6 3.6 0 0 1-4.3-4.3 3.6 3.6 0 0 1 0-6z",
+  signature: "M12 20h9 M16.4 3.6a1.4 1.4 0 0 1 2 2L7.4 16.6l-3 1 1-3z",
+  active: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M10 8l6 4-6 4z",
+  renewal: "M17 2l4 4-4 4 M3 11v-1a4 4 0 0 1 4-4h14 M7 22l-4-4 4-4 M21 13v1a4 4 0 0 1-4 4H3",
+  archived: "M2 4h20v5H2z M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9 M10 13h4"
+};
+
+const STEPS = [
+  { key:"draft", name:"Draft", agentName:"Legal", description:"Legal drafts the initial contract text.", col:0, row:0, isInitial:true, isTerminal:false },
+  { key:"legal_review", name:"Legal Review", agentName:"Legal", description:"Legal reviews terms for risk and compliance.", col:1, row:0, isInitial:false, isTerminal:false },
+  { key:"negotiation", name:"Negotiation", agentName:"Counterparty", description:"Terms are negotiated with the counterparty.", col:2, row:0, isInitial:false, isTerminal:false },
+  { key:"approval", name:"Approval", agentName:"Finance", description:"Finance signs off on commercial terms.", col:2, row:1, isInitial:false, isTerminal:false },
+  { key:"signature", name:"Signature", agentName:"Signatories", description:"Authorized signatories execute the contract.", col:3, row:0, isInitial:false, isTerminal:false },
+  { key:"active", name:"Active", agentName:"Contract Ops", description:"Contract is in force and being monitored.", col:4, row:0, isInitial:false, isTerminal:false },
+  { key:"renewal", name:"Renewal", agentName:"Contract Ops", description:"Terms are revisited ahead of expiry.", col:4, row:1, isInitial:false, isTerminal:false },
+  { key:"archived", name:"Archived", agentName:"Contract Ops", description:"Contract is closed out and stored.", col:5, row:0, isInitial:false, isTerminal:true }
+];
+
+const TRANSITIONS = [
+  { from:"draft", to:"legal_review", action:"submit_for_review", description:"Sends the draft to Legal for review." },
+  { from:"legal_review", to:"negotiation", action:"needs_changes", description:"Sends terms back for negotiation." },
+  { from:"legal_review", to:"approval", action:"approve", description:"Legal signs off, forwards to Finance." },
+  { from:"negotiation", to:"draft", action:"reject", description:"Counterparty rejects — back to drafting." },
+  { from:"negotiation", to:"legal_review", action:"resubmit", description:"Revised terms go back to Legal." },
+  { from:"approval", to:"signature", action:"approve", description:"Finance approves — ready to sign." },
+  { from:"approval", to:"draft", action:"request_changes", description:"Finance sends it back to redraft." },
+  { from:"signature", to:"active", action:"fully_executed", description:"All parties have signed." },
+  { from:"active", to:"renewal", action:"initiate_renewal", description:"Kicks off the renewal process." },
+  { from:"active", to:"archived", action:"terminate", description:"Contract is closed out." },
+  { from:"renewal", to:"negotiation", action:"renegotiate", description:"Renewal terms need negotiation." },
+  { from:"renewal", to:"signature", action:"re_sign", description:"Renewal terms are ready to re-sign." }
+];
+
+const AGENTS = [
+  { id:1, name:"Legal" }, { id:2, name:"Counterparty" }, { id:3, name:"Finance" },
+  { id:4, name:"Signatories" }, { id:5, name:"Contract Ops" }
+];
+
+function computeGraph(steps, transitions) {
+  const NODE_W = 176, NODE_H = 68, COL_GAP = 96, ROW_GAP = 64, PAD = 48;
+  const maxCol = Math.max(...steps.map(s => s.col));
+  const maxRow = Math.max(...steps.map(s => s.row));
+  const nodeByKey = {};
+  const nodes = steps.map(s => {
+    const x = PAD + s.col * (NODE_W + COL_GAP);
+    const y = PAD + s.row * (NODE_H + ROW_GAP);
+    const n = { ...s, x, y, w: NODE_W, h: NODE_H, cx: x + NODE_W / 2, cy: y + NODE_H / 2, portBottomY: y + NODE_H };
+    nodeByKey[s.key] = n;
+    return n;
+  });
+  const baseHeight = PAD * 2 + (maxRow + 1) * NODE_H + maxRow * ROW_GAP;
+  const baseWidth = PAD * 2 + (maxCol + 1) * NODE_W + maxCol * COL_GAP;
+  let laneCount = 0;
+  const edges = transitions.map(t => {
+    const from = nodeByKey[t.from], to = nodeByKey[t.to];
+    const isLoop = to.col <= from.col;
+    let d, labelX, labelY;
+    if (!isLoop) {
+      const x1 = from.x + from.w, y1 = from.cy, x2 = to.x, y2 = to.cy;
+      const mx = (x1 + x2) / 2;
+      d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+      labelX = mx; labelY = (y1 + y2) / 2 - 10;
+    } else {
+      laneCount++;
+      const laneY = baseHeight + 24 + (laneCount - 1) * 30;
+      const x1 = from.cx, y1 = from.portBottomY, x2 = to.cx, y2 = to.portBottomY;
+      d = `M ${x1} ${y1} C ${x1} ${laneY}, ${x1} ${laneY}, ${x1} ${laneY} L ${x2} ${laneY} C ${x2} ${laneY}, ${x2} ${laneY}, ${x2} ${y2}`;
+      labelX = (x1 + x2) / 2; labelY = laneY - 8;
+    }
+    return { ...t, d, isLoop, labelX, labelY };
+  });
+  const height = baseHeight + (laneCount ? 24 + laneCount * 30 + 24 : 24);
+  return { nodes, edges, width: baseWidth, height };
+}
+
+class Component extends DCLogic {
+  preventSubmit(e) { e.preventDefault(); }
+
+  renderVals() {
+    const status = this.props.status ?? "draft";
+    const view = this.props.graphView ?? "graph";
+    const sample = this.props.sampleState ?? "populated";
+    const showError = this.props.errorBanner ?? false;
+    const isDraft = status === "draft";
+    const steps = sample === "empty" ? [] : STEPS;
+    const transitions = sample === "empty" ? [] : TRANSITIONS;
+
+    const statusMap = {
+      active: { label: "Active", bg: "oklch(0.78 0.15 80 / 0.16)", fg: "var(--primary)", border: "oklch(0.78 0.15 80 / 0.35)" },
+      draft: { label: "Draft", bg: "var(--muted)", fg: "var(--muted-fg)", border: "var(--border)" },
+      retired: { label: "Retired", bg: "transparent", fg: "var(--muted-fg)", border: "var(--border)" }
+    };
+    const s = statusMap[status] ?? statusMap.draft;
+
+    const zebra = (i) => i % 2 === 1 ? "var(--muted)" : "transparent";
+
+    const stepRows = steps.map((st, i) => ({ ...st, iconD: STEP_ICONS[st.key], rowBg: zebra(i) }));
+    const transitionRows = transitions.map((t, i) => ({
+      ...t, hasDescription: !!t.description, rowBg: zebra(i)
+    }));
+
+    let graph = null, graphNodes = [], graphEdges = [];
+    if (view === "graph" && steps.length) {
+      graph = computeGraph(steps, transitions);
+      graphNodes = graph.nodes.map(n => ({
+        ...n,
+        xPx: n.x + "px", yPx: n.y + "px", wPx: n.w + "px", hPx: n.h + "px",
+        iconD: STEP_ICONS[n.key],
+        bg: n.isInitial ? "oklch(0.78 0.15 80 / 0.14)" : n.isTerminal ? "var(--muted)" : "var(--card)",
+        border: n.isInitial ? "1px solid oklch(0.78 0.15 80 / 0.5)" : "1px solid var(--border)",
+        iconColor: n.isInitial ? "var(--primary)" : "var(--muted-fg)",
+        textColor: "var(--fg)",
+        badgeLabel: n.isInitial ? "Start" : n.isTerminal ? "End" : ""
+      }));
+      graphEdges = graph.edges.map(e => ({
+        ...e,
+        stroke: e.isLoop ? "var(--primary)" : "var(--muted-fg)",
+        strokeWidth: e.isLoop ? "1.75" : "1.5",
+        dash: e.isLoop ? "5,4" : "0",
+        markerUrl: e.isLoop ? "url(#wf-arrow-loop)" : "url(#wf-arrow)",
+        labelColor: e.isLoop ? "var(--primary)" : "var(--muted-fg)",
+        labelX: e.labelX + "px", labelY: e.labelY + "px"
+      }));
+    }
+
+    const pipelineSteps = steps.map((st, i) => ({ ...st, iconD: STEP_ICONS[st.key], hasNext: i < steps.length - 1 }));
+
+    return {
+      workflowName: "Master Services Agreement",
+      workflowDescription: "Default lifecycle for MSAs and their amendments — draft, legal review, negotiation, sign-off, and renewal.",
+      statusLabel: s.label, statusBadgeBg: s.bg, statusBadgeFg: s.fg, statusBadgeBorder: s.border,
+      showError, errorText: "That action isn't available for this workflow's current status.",
+      isDraft, isLive: !isDraft,
+      hasSteps: steps.length > 0, noSteps: steps.length === 0,
+      hasTransitions: transitions.length > 0, noTransitions: transitions.length === 0,
+      isGraphView: view === "graph",
+      isPipelineView: view === "pipeline",
+      graphWidth: graph ? graph.width : 0, graphHeight: graph ? graph.height : 0,
+      graphWidthPx: graph ? graph.width + "px" : "0px", graphHeightPx: graph ? graph.height + "px" : "0px",
+      graphNodes, graphEdges, pipelineSteps,
+      stepRows, transitionRows,
+      agentOptions: AGENTS, stepOptions: steps,
+      showTransitionForm: isDraft && steps.length >= 2,
+      needsMoreSteps: isDraft && steps.length < 2,
+      hasIssues: (this.props.readyToActivate ?? false) === false,
+      noIssues: (this.props.readyToActivate ?? false) === true,
+      issueList: ["Step \u201crenewal\u201d has no path back to an end step.", "No end step is currently marked as terminal-reachable from every branch."],
+      activateOpacity: (this.props.readyToActivate ?? false) === false ? "0.5" : "1",
+      preventSubmit: this.preventSubmit
+    };
+  }
+}
+
+</script>
+</body>
+</html>

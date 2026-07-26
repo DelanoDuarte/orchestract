@@ -28,47 +28,47 @@
   </section>
 </div>
 
+<div class="card mb-6" data-size="sm">
+  <header>
+    <h2>Current step: {{ current_step_name }}</h2>
+    <p>Owned by {{ current_agent_name }}{% set current_step_description = definition.get_step(instance.current_step_key).description %}{% if current_step_description %} — {{ current_step_description }}{% endif %}</p>
+    <div class="card-action">
+      {% if instance.status.value == "active" %}
+      <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
+      {% else %}
+      <span class="badge" data-variant="secondary">Completed</span>
+      {% endif %}
+    </div>
+  </header>
+  <section>
+    {% if actions %}
+    <div class="flex flex-col gap-3">
+      {% for action in actions %}
+      <form method="post" action="/{{ organization.slug }}/documents/{{ document.id }}/transitions"
+            class="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
+        <input type="hidden" name="action_name" value="{{ action.action_name }}">
+        <div role="group" class="field min-w-[8rem] flex-1">
+          <label>Actor</label>
+          <input type="text" name="actor" required placeholder="Your name">
+        </div>
+        <div role="group" class="field min-w-[10rem] flex-1">
+          <label>Comment</label>
+          <input type="text" name="comment" placeholder="Optional">
+        </div>
+        <button type="submit" class="btn" data-variant="outline">
+          <span>{{ action.action_name }}</span>{{ icon('arrow-right', 'size-4') }}<span>{{ action.to_step_key }}</span>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-muted-foreground">No further actions available — workflow complete.</p>
+    {% endif %}
+  </section>
+</div>
+
 <div class="grid gap-6 lg:grid-cols-3">
   <div class="card lg:col-span-2" data-size="sm">
-    <header>
-      <h2>Current step: {{ current_step_name }}</h2>
-      <p>Owned by {{ current_agent_name }}{% set current_step_description = definition.get_step(instance.current_step_key).description %}{% if current_step_description %} — {{ current_step_description }}{% endif %}</p>
-      <div class="card-action">
-        {% if instance.status.value == "active" %}
-        <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
-        {% else %}
-        <span class="badge" data-variant="secondary">Completed</span>
-        {% endif %}
-      </div>
-    </header>
-    <section>
-      {% if actions %}
-      <div class="flex flex-col gap-3">
-        {% for action in actions %}
-        <form method="post" action="/{{ organization.slug }}/documents/{{ document.id }}/transitions"
-              class="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
-          <input type="hidden" name="action_name" value="{{ action.action_name }}">
-          <div role="group" class="field min-w-[8rem] flex-1">
-            <label>Actor</label>
-            <input type="text" name="actor" required placeholder="Your name">
-          </div>
-          <div role="group" class="field min-w-[10rem] flex-1">
-            <label>Comment</label>
-            <input type="text" name="comment" placeholder="Optional">
-          </div>
-          <button type="submit" class="btn" data-variant="outline">
-            <span>{{ action.action_name }}</span>{{ icon('arrow-right', 'size-4') }}<span>{{ action.to_step_key }}</span>
-          </button>
-        </form>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="text-sm text-muted-foreground">No further actions available — workflow complete.</p>
-      {% endif %}
-    </section>
-  </div>
-
-  <div class="card" data-size="sm">
     <header><h2>Versions</h2></header>
     <div class="table-container">
       <table class="table">
@@ -120,6 +120,21 @@
       </a>
       {% endfor %}
     </footer>
+  </div>
+
+  <div class="card flex flex-col gap-3" data-size="sm">
+    <h2 class="text-sm font-semibold">At a glance</h2>
+    <div class="flex flex-col gap-2.5 text-[0.8rem]">
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">Steps traveled</span><span class="font-semibold">{{ steps_traveled }} of {{ total_steps }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">Versions</span><span class="font-semibold">{{ document.versions|length }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">Started</span><span class="font-semibold">{{ instance.started_at.strftime("%Y-%m-%d") }}</span>
+      </div>
+    </div>
   </div>
 </div>
 

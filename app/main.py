@@ -1,12 +1,18 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.deps import NotAuthenticatedError
 from app.api.routers import agents, documents, organizations, storage, workflows
 from app.domain.shared.exceptions import ConflictError, DomainError, NotFoundError
 from app.web.routes import org_router, root_router
 
 app = FastAPI(title="Orchestract", description="Contract & document workflow orchestrator")
+
+
+@app.exception_handler(NotAuthenticatedError)
+async def handle_not_authenticated(request: Request, exc: NotAuthenticatedError) -> RedirectResponse:
+    return RedirectResponse(f"/login?next={exc.next_path}", status_code=303)
 
 
 @app.exception_handler(NotFoundError)

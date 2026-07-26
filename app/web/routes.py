@@ -6,17 +6,26 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.api.deps import (
+    SESSION_COOKIE_NAME,
     agent_service,
+    current_role_for_template,
+    current_user_dep,
+    current_user_for_template,
     document_service,
+    enforce_login_and_membership,
     get_current_organization_from_path,
     organization_service,
+    role_service,
     storage_service,
+    user_service,
     workflow_service,
 )
 from app.config import get_settings
 from app.domain.shared.exceptions import DomainError
 from app.domain.storage.models import StorageProvider
 from app.domain.tenancy.models import Organization
+from app.domain.users.exceptions import InvalidCredentialsError, PermissionDeniedError
+from app.domain.users.models import User
 from app.domain.workflow.models import WorkflowDefinition, WorkflowStatus
 from app.web.icons import icon, step_icon_name
 
@@ -25,9 +34,11 @@ OAUTH_PROVIDER_LABELS = {StorageProvider.GOOGLE_DRIVE: "Google Drive", StoragePr
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.globals["icon"] = icon
 templates.env.globals["step_icon"] = step_icon_name
+templates.env.globals["current_user"] = current_user_for_template
+templates.env.globals["current_role"] = current_role_for_template
 
 root_router = APIRouter()
-org_router = APIRouter(prefix="/{org_slug}")
+org_router = APIRouter(prefix="/{org_slug}", dependencies=[Depends(enforce_login_and_membership)])
 
 
 async def _agent_names(organization_id: int) -> dict[int, str]:
@@ -38,6 +49,45 @@ async def _agent_names(organization_id: int) -> dict[int, str]:
 def _step_and_agent(definition: WorkflowDefinition, step_key: str, agent_names: dict[int, str]) -> tuple[str, str]:
     step = definition.get_step(step_key)
     return step.name, agent_names.get(step.agent_id, f"agent #{step.agent_id}")
+
+
+async def _document_rows_with_step_info(organization_id: int, documents: list) -> list[dict]:
+    """Enriches raw Documents with their live workflow instance/definition
+    so a template can render the current step and lifecycle pipeline
+    (used by both the Dashboard and Documents list "Preview" dialogs)."""
+    agent_names = await _agent_names(organization_id)
+    definitions_cache: dict[int, WorkflowDefinition] = {}
+    rows = []
+    for document in documents:
+        instance = await document_service.get_instance(document.id)
+        definition = definitions_cache.get(instance.workflow_definition_id)
+        if definition is None:
+            definition = await workflow_service.get(instance.workflow_definition_id)
+            definitions_cache[instance.workflow_definition_id] = definition
+        step_name, agent_name = _step_and_agent(definition, instance.current_step_key, agent_names)
+        rows.append(
+            {
+                "document": document,
+                "instance": instance,
+                "definition": definition,
+                "step_name": step_name,
+                "step_icon": step_icon_name(instance.current_step_key),
+                "agent_name": agent_name,
+                "status": instance.status.value,
+            }
+        )
+    return rows
+
+
+async def _assert_can_edit_current_step(document_id: int, current_user: User) -> None:
+    """Defense in depth: the document_detail template already hides the
+    edit forms when this would fail, but every mutating route re-checks
+    server-side before touching anything."""
+    instance = await document_service.get_instance(document_id)
+    definition = await workflow_service.get(instance.workflow_definition_id)
+    step = definition.get_step(instance.current_step_key)
+    if not await role_service.can_edit_step(current_user, step.agent_id):
+        raise PermissionDeniedError()
 
 
 @root_router.get("/")
@@ -53,30 +103,45 @@ async def oauth_callback(provider: StorageProvider, request: Request, code: str,
     return RedirectResponse(f"/{organization.slug}/settings/storage", status_code=303)
 
 
+@root_router.get("/login")
+async def login_page(request: Request, next: str = "/"):
+    return templates.TemplateResponse(request, "login.html", {"next": next})
+
+
+@root_router.post("/login")
+async def login_submit(request: Request, email: str = Form(...), password: str = Form(...), next: str = Form("/")):
+    try:
+        user = await user_service.authenticate(email, password)
+    except InvalidCredentialsError as exc:
+        return templates.TemplateResponse(
+            request, "login.html", {"next": next, "error": str(exc)}, status_code=422
+        )
+    session = await user_service.create_session(user.id)
+    organization = await organization_service.get(user.organization_id)
+    redirect_to = next if next.startswith(f"/{organization.slug}/") else f"/{organization.slug}/"
+    response = RedirectResponse(redirect_to, status_code=303)
+    response.set_cookie(
+        SESSION_COOKIE_NAME, session.token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 14
+    )
+    return response
+
+
+@root_router.post("/logout")
+async def logout(request: Request):
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if token:
+        await user_service.delete_session(token)
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return response
+
+
 @org_router.get("/")
 async def dashboard(
     request: Request, organization: Organization = Depends(get_current_organization_from_path)
 ):
     documents = await document_service.list_for_organization(organization.id)
-    agent_names = await _agent_names(organization.id)
-    definitions_cache: dict[int, WorkflowDefinition] = {}
-    rows = []
-    for document in documents:
-        instance = await document_service.get_instance(document.id)
-        definition = definitions_cache.get(instance.workflow_definition_id)
-        if definition is None:
-            definition = await workflow_service.get(instance.workflow_definition_id)
-            definitions_cache[instance.workflow_definition_id] = definition
-        step_name, agent_name = _step_and_agent(definition, instance.current_step_key, agent_names)
-        rows.append(
-            {
-                "document": document,
-                "step_name": step_name,
-                "step_icon": step_icon_name(instance.current_step_key),
-                "agent_name": agent_name,
-                "status": instance.status.value,
-            }
-        )
+    rows = await _document_rows_with_step_info(organization.id, documents)
     active_count = sum(1 for row in rows if row["status"] == "active")
     stats = [
         {"label": "In progress", "value": active_count},
@@ -155,6 +220,113 @@ async def toggle_agent(
     agent = await agent_service.get(agent_id)
     await agent_service.set_active(agent_id, not agent.is_active)
     return await agents_page(request, organization)
+
+
+@org_router.get("/roles")
+async def roles_page(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+):
+    roles = await role_service.list_roles(organization.id)
+    agent_names = await _agent_names(organization.id)
+    return templates.TemplateResponse(
+        request,
+        "roles.html",
+        {"organization": organization, "roles": roles, "agent_names": agent_names, "active_nav": "roles"},
+    )
+
+
+@org_router.get("/roles/new")
+async def new_role_page(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+):
+    agents = await agent_service.list_agents(organization.id)
+    return templates.TemplateResponse(
+        request,
+        "role_new.html",
+        {"organization": organization, "agents": agents, "active_nav": "roles"},
+    )
+
+
+@org_router.post("/roles")
+async def create_role(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    agent_id: str = Form(""),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        await role_service.create_role(
+            organization.id, name, description or None, int(agent_id) if agent_id else None
+        )
+    except DomainError as exc:
+        agents = await agent_service.list_agents(organization.id)
+        return templates.TemplateResponse(
+            request,
+            "role_new.html",
+            {"organization": organization, "agents": agents, "active_nav": "roles", "error": str(exc)},
+            status_code=422,
+        )
+    return await roles_page(request, organization)
+
+
+@org_router.get("/users")
+async def users_page(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+):
+    users = await user_service.list_users(organization.id)
+    roles = await role_service.list_roles(organization.id)
+    role_names = {role.id: role.name for role in roles}
+    return templates.TemplateResponse(
+        request,
+        "users.html",
+        {"organization": organization, "users": users, "role_names": role_names, "active_nav": "users"},
+    )
+
+
+@org_router.get("/users/new")
+async def new_user_page(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+):
+    roles = await role_service.list_roles(organization.id)
+    return templates.TemplateResponse(
+        request,
+        "user_new.html",
+        {"organization": organization, "roles": roles, "active_nav": "users"},
+    )
+
+
+@org_router.post("/users")
+async def create_user(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role_id: int = Form(...),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        await user_service.create_user(organization.id, name, email, password, role_id)
+    except DomainError as exc:
+        roles = await role_service.list_roles(organization.id)
+        return templates.TemplateResponse(
+            request,
+            "user_new.html",
+            {"organization": organization, "roles": roles, "active_nav": "users", "error": str(exc)},
+            status_code=422,
+        )
+    return await users_page(request, organization)
+
+
+@org_router.post("/users/{user_id}/toggle")
+async def toggle_user(
+    user_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    user = await user_service.get(user_id)
+    await user_service.set_active(user_id, not user.is_active)
+    return await users_page(request, organization)
 
 
 async def _storage_settings_context(organization: Organization) -> dict:
@@ -396,12 +568,13 @@ async def documents_page(
         documents = [d for d in documents if needle in d.title.lower()]
     if doc_type:
         documents = [d for d in documents if d.document_type == doc_type]
+    rows = await _document_rows_with_step_info(organization.id, documents)
     return templates.TemplateResponse(
         request,
         "documents_list.html",
         {
             "organization": organization,
-            "documents": documents,
+            "rows": rows,
             "doc_types": doc_types,
             "search_query": q,
             "active_type": doc_type,
@@ -429,13 +602,13 @@ async def create_document(
     title: str = Form(...),
     document_type: str = Form(...),
     workflow_definition_id: int = Form(...),
-    actor: str = Form(...),
     description: str = Form(""),
     organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
 ):
     try:
         document = await document_service.create_document(
-            organization.id, title, document_type, workflow_definition_id, actor, description or None
+            organization.id, title, document_type, workflow_definition_id, current_user.name, description or None
         )
     except DomainError as exc:
         workflows = await workflow_service.list_for_organization(organization.id)
@@ -454,7 +627,7 @@ async def create_document(
     return await document_detail(document.id, request, organization)
 
 
-async def _document_detail_context(organization: Organization, document_id: int) -> dict:
+async def _document_detail_context(organization: Organization, document_id: int, current_user: User) -> dict:
     document = await document_service.get(document_id)
     instance = await document_service.get_instance(document_id)
     definition = await workflow_service.get(instance.workflow_definition_id)
@@ -466,6 +639,9 @@ async def _document_detail_context(organization: Organization, document_id: int)
         c for c in connections if c.provider in OAUTH_PROVIDER_LABELS and c.status.value == "connected"
     ]
     steps_traveled = len({entry.to_step_key for entry in instance.history})
+    current_step_agent_id = definition.get_step(instance.current_step_key).agent_id
+    can_edit = await role_service.can_edit_step(current_user, current_step_agent_id)
+    edit_roles = await role_service.list_for_agent(current_step_agent_id)
     return {
         "organization": organization,
         "document": document,
@@ -478,6 +654,8 @@ async def _document_detail_context(organization: Organization, document_id: int)
         "oauth_provider_labels": OAUTH_PROVIDER_LABELS,
         "steps_traveled": steps_traveled,
         "total_steps": len(definition.steps),
+        "can_edit": can_edit,
+        "edit_role_names": [role.name for role in edit_roles],
         "active_nav": "documents",
     }
 
@@ -487,8 +665,9 @@ async def document_detail(
     document_id: int,
     request: Request,
     organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
 ):
-    context = await _document_detail_context(organization, document_id)
+    context = await _document_detail_context(organization, document_id, current_user)
     return templates.TemplateResponse(request, "document_detail.html", context)
 
 
@@ -497,17 +676,18 @@ async def execute_transition(
     document_id: int,
     request: Request,
     action_name: str = Form(...),
-    actor: str = Form(...),
     comment: str = Form(""),
     organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
 ):
     try:
-        await document_service.transition_document(document_id, action_name, actor, comment or None)
+        await _assert_can_edit_current_step(document_id, current_user)
+        await document_service.transition_document(document_id, action_name, current_user.name, comment or None)
     except DomainError as exc:
-        context = await _document_detail_context(organization, document_id)
+        context = await _document_detail_context(organization, document_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "document_detail.html", context, status_code=422)
-    return await document_detail(document_id, request, organization)
+    return await document_detail(document_id, request, organization, current_user)
 
 
 @org_router.post("/documents/{document_id}/versions")
@@ -515,25 +695,26 @@ async def upload_version(
     document_id: int,
     request: Request,
     file: UploadFile,
-    uploaded_by: str = Form(...),
     notes: str = Form(""),
     organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
 ):
     try:
+        await _assert_can_edit_current_step(document_id, current_user)
         content = await file.read()
         await document_service.upload_version(
             document_id,
             content,
             file.filename or "file",
             file.content_type or "application/octet-stream",
-            uploaded_by,
+            current_user.name,
             notes or None,
         )
     except DomainError as exc:
-        context = await _document_detail_context(organization, document_id)
+        context = await _document_detail_context(organization, document_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "document_detail.html", context, status_code=422)
-    return await document_detail(document_id, request, organization)
+    return await document_detail(document_id, request, organization, current_user)
 
 
 @org_router.get("/documents/{document_id}/import/{connection_id}")
@@ -543,7 +724,12 @@ async def import_browser_page(
     request: Request,
     folder_id: str | None = None,
     organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
 ):
+    try:
+        await _assert_can_edit_current_step(document_id, current_user)
+    except PermissionDeniedError:
+        return RedirectResponse(f"/{organization.slug}/documents/{document_id}", status_code=303)
     document = await document_service.get(document_id)
     connection = await storage_service.get(connection_id)
     files = await storage_service.browse_external_files(connection_id, folder_id)
@@ -566,16 +752,17 @@ async def import_version(
     connection_id: int,
     request: Request,
     external_file_id: str = Form(...),
-    uploaded_by: str = Form(...),
     notes: str = Form(""),
     organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
 ):
     try:
+        await _assert_can_edit_current_step(document_id, current_user)
         await document_service.import_version_from_external(
-            document_id, connection_id, external_file_id, uploaded_by, notes or None
+            document_id, connection_id, external_file_id, current_user.name, notes or None
         )
     except DomainError as exc:
-        context = await _document_detail_context(organization, document_id)
+        context = await _document_detail_context(organization, document_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "document_detail.html", context, status_code=422)
-    return await document_detail(document_id, request, organization)
+    return await document_detail(document_id, request, organization, current_user)

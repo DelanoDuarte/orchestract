@@ -22,7 +22,6 @@
             <form method="post" action="/{{ organization.slug }}/documents/{{ document.id }}/import/{{ connection.id }}"
                   class="flex flex-wrap items-center justify-end gap-2">
               <input type="hidden" name="external_file_id" value="{{ file.id }}">
-              <input type="text" name="uploaded_by" placeholder="Your name" required class="w-32">
               <input type="text" name="notes" placeholder="Notes (optional)" class="w-40">
               <button type="submit" class="btn" data-size="sm">Import</button>
             </form>

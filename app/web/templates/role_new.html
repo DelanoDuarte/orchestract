@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}New role{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">New role</h1>
+  <p class="text-sm text-muted-foreground">e.g. Legal Lead, Finance Approver, Signatory.</p>
+</div>
+
+{% if error %}
+<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+{% endif %}
+
+<div class="card mx-auto max-w-lg" data-size="sm">
+  <section>
+    <form method="post" action="/{{ organization.slug }}/roles" class="flex flex-col gap-4">
+      <div role="group" class="field">
+        <label for="role-name">Name</label>
+        <input id="role-name" type="text" name="name" required>
+      </div>
+      <div role="group" class="field">
+        <label for="role-description">Description</label>
+        <input id="role-description" type="text" name="description">
+      </div>
+      <div role="group" class="field">
+        <label for="role-agent">Linked agent</label>
+        <select id="role-agent" name="agent_id" class="select w-full">
+          <option value="">None — open to anyone</option>
+          {% for agent in agents %}<option value="{{ agent.id }}">{{ agent.name }}</option>{% endfor %}
+        </select>
+        <p>Only users with this role (or another role linked to the same agent) may act on steps this agent owns.</p>
+      </div>
+      <button type="submit" class="btn w-full">Create role</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

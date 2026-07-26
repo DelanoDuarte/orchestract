@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}Documents{% endblock %}
 {% block content %}
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -36,14 +37,18 @@
         <tr><th>Title</th><th>Type</th><th>Version</th><th>Updated</th><th></th></tr>
       </thead>
       <tbody>
-        {% for doc in documents %}
+        {% for row in rows %}
         <tr>
-          <td class="font-medium">{{ doc.title }}</td>
-          <td>{{ doc.document_type }}</td>
-          <td>v{{ doc.current_version_no }}</td>
-          <td class="text-muted-foreground">{{ doc.updated_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td class="font-medium">{{ row.document.title }}</td>
+          <td>{{ row.document.document_type }}</td>
+          <td>v{{ row.document.current_version_no }}</td>
+          <td class="text-muted-foreground">{{ row.document.updated_at.strftime("%Y-%m-%d %H:%M") }}</td>
           <td class="text-end">
-            <a href="/{{ organization.slug }}/documents/{{ doc.id }}" class="btn" data-variant="ghost" data-size="sm">
+            <button type="button" class="btn" data-variant="ghost" data-size="sm"
+                    onclick="document.getElementById('preview-{{ row.document.id }}').showModal()">
+              {{ icon('layers', 'size-4') }}<span>Preview</span>
+            </button>
+            <a href="/{{ organization.slug }}/documents/{{ row.document.id }}" class="btn" data-variant="ghost" data-size="sm">
               View{{ icon('chevron-right', 'size-4') }}
             </a>
           </td>
@@ -55,4 +60,33 @@
     </table>
   </div>
 </div>
+
+{% for row in rows %}
+<dialog id="preview-{{ row.document.id }}" class="dialog">
+  <article>
+    <header>
+      <h2>{{ row.document.title }}</h2>
+      <p>{{ row.document.document_type }}</p>
+    </header>
+    <section class="flex flex-col gap-4">
+      <div class="flex items-center justify-between text-sm">
+        <span class="inline-flex items-center gap-1.5">
+          <span class="text-muted-foreground">{{ icon(row.step_icon, 'size-4') }}</span>
+          Current step: <span class="font-medium">{{ row.step_name }}</span> · {{ row.agent_name }}
+        </span>
+        {% if row.status == "active" %}
+        <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
+        {% else %}
+        <span class="badge" data-variant="secondary">Completed</span>
+        {% endif %}
+      </div>
+      {{ macros.step_pipeline(row.definition.steps, row.instance.current_step_key) }}
+    </section>
+    <footer class="flex justify-end gap-2">
+      <button type="button" class="btn" data-variant="ghost" onclick="this.closest('dialog').close()">Close</button>
+      <a href="/{{ organization.slug }}/documents/{{ row.document.id }}" class="btn">View full details</a>
+    </footer>
+  </article>
+</dialog>
+{% endfor %}
 {% endblock %}

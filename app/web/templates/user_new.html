@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}New user{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">New user</h1>
+  <p class="text-sm text-muted-foreground">Give them a role so the app knows which workflow steps they can act on.</p>
+</div>
+
+{% if error %}
+<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+{% endif %}
+
+<div class="card mx-auto max-w-lg" data-size="sm">
+  <section>
+    {% if roles %}
+    <form method="post" action="/{{ organization.slug }}/users" class="flex flex-col gap-4">
+      <div role="group" class="field">
+        <label for="user-name">Name</label>
+        <input id="user-name" type="text" name="name" required>
+      </div>
+      <div role="group" class="field">
+        <label for="user-email">Email</label>
+        <input id="user-email" type="email" name="email" required>
+      </div>
+      <div role="group" class="field">
+        <label for="user-password">Password</label>
+        <input id="user-password" type="password" name="password" required minlength="8">
+      </div>
+      <div role="group" class="field">
+        <label for="user-role">Role</label>
+        <select id="user-role" name="role_id" class="select w-full" required>
+          {% for role in roles %}<option value="{{ role.id }}">{{ role.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn w-full">Create user</button>
+    </form>
+    {% else %}
+    <p class="text-sm text-muted-foreground">
+      No roles yet — <a class="underline" href="/{{ organization.slug }}/roles/new">create one first</a>.
+    </p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

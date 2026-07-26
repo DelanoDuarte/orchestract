@@ -10,4 +10,9 @@ def slugify(text: str) -> str:
 
 
 def utcnow() -> datetime:
-    return datetime.now(UTC)
+    """Naive UTC timestamp -- SQLite (this app's only backend so far) drops
+    tzinfo on round-trip regardless of the column type, so every value read
+    back from the DB is naive. Returning naive here too keeps freshly
+    computed timestamps comparable to ones loaded from a row (needed by
+    UserSession.is_valid()) instead of raising on offset-aware vs -naive."""
+    return datetime.now(UTC).replace(tzinfo=None)

@@ -1,0 +1,11 @@
+{% macro step_pipeline(steps, current_step_key=None) %}
+<div class="step-pipeline">
+  {% for step in steps %}
+  <div class="step-pill" data-current="{{ "true" if step.key == current_step_key else "false" }}">
+    {{ icon(step_icon(step.key), 'size-5') }}
+    <span class="text-xs font-medium uppercase tracking-wide">{{ step.name }}</span>
+  </div>
+  {% if not loop.last %}<span class="step-arrow">{{ icon('arrow-right', 'size-4') }}</span>{% endif %}
+  {% endfor %}
+</div>
+{% endmacro %}

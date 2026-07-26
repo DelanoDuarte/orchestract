@@ -24,6 +24,16 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
 <link rel="stylesheet" href="/static/theme.css">
 <script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
+<style>
+  .sidebar nav ul li a{ position:relative; transition:background-color .15s ease, color .15s ease; }
+  .sidebar nav ul li a:hover{ background-color:var(--sidebar-accent); color:var(--sidebar-accent-foreground); }
+  .sidebar nav ul li a[aria-current="page"]::before{
+    content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px;
+    border-radius:0 3px 3px 0; background:var(--sidebar-primary);
+  }
+  header .btn{ transition:transform .15s ease; }
+  header .btn:hover{ transform:translateY(-1px); }
+</style>
 </head>
 <body class="min-h-svh bg-background text-foreground">
 <div class="flex min-h-svh">
@@ -37,6 +47,9 @@
       <section class="scrollbar-sm">
         <div role="group" aria-labelledby="group-label-nav">
           <h3 id="group-label-nav">{{ organization.name }}</h3>
+        </div>
+        <div role="group" aria-labelledby="group-label-workspace">
+          <h3 id="group-label-workspace">Workspace</h3>
           <ul>
             <li>
               <a href="/{{ organization.slug }}/" {% if active_nav == "dashboard" %}aria-current="page"{% endif %}>
@@ -56,6 +69,21 @@
             <li>
               <a href="/{{ organization.slug }}/agents" {% if active_nav == "agents" %}aria-current="page"{% endif %}>
                 {{ icon('users') }}<span>Agents</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div role="group" aria-labelledby="group-label-admin">
+          <h3 id="group-label-admin">Administration</h3>
+          <ul>
+            <li>
+              <a href="/{{ organization.slug }}/roles" {% if active_nav == "roles" %}aria-current="page"{% endif %}>
+                {{ icon('shield') }}<span>Roles</span>
+              </a>
+            </li>
+            <li>
+              <a href="/{{ organization.slug }}/users" {% if active_nav == "users" %}aria-current="page"{% endif %}>
+                {{ icon('user-plus') }}<span>Users</span>
               </a>
             </li>
             <li>
@@ -85,9 +113,21 @@
       {% endif %}
       <div class="flex items-center gap-2">
         {% if organization %}
+        {% set me = current_user(request) %}
+        {% set my_role = current_role(request) %}
+        {% if me %}
+        <span class="hidden text-sm text-muted-foreground sm:inline">
+          Signed in as <span class="font-medium text-foreground">{{ me.name }}</span>{% if my_role %} · {{ my_role.name }}{% endif %}
+        </span>
+        {% endif %}
         <a href="/" class="btn" data-variant="ghost" data-size="sm">
           {{ icon('building-2', 'size-4') }}<span>Switch organization</span>
         </a>
+        <form method="post" action="/logout">
+          <button type="submit" class="btn" data-variant="ghost" data-size="icon" aria-label="Log out">
+            {{ icon('log-out', 'size-4') }}
+          </button>
+        </form>
         {% endif %}
         <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="Toggle theme"
                 onclick="window.basecoat.theme.toggle()">

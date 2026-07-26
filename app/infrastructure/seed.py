@@ -12,13 +12,31 @@ from app.api.deps import (
     agent_service,
     document_service,
     organization_service,
+    role_service,
     storage_service,
+    user_service,
     workflow_service,
 )
 from app.domain.shared.exceptions import NotFoundError
 from app.domain.storage.models import StorageProvider
 
 ORG_NAME = "Acme Corp"
+
+# Roles demonstrate the permission rule: "Draft" and "Sign" are gated to a
+# specific role via `linked_agent`; every other step's agent has no role
+# linked to it, so it stays open to anyone signed in (including "staff",
+# whose role isn't linked to any agent at all).
+ROLE_DEFINITIONS = [
+    ("Drafting Lead", "Can act on the Draft step.", "Drafting"),
+    ("Signatory Lead", "Can act on the Sign step.", "Signatory"),
+    ("General Staff", "No agent link — can act on any step nobody else is gating.", None),
+]
+
+USER_DEFINITIONS = [
+    ("Dana Drafter", "drafter@acme.test", "password123", "Drafting Lead"),
+    ("Sam Signer", "signer@acme.test", "password123", "Signatory Lead"),
+    ("Riley Staff", "staff@acme.test", "password123", "General Staff"),
+]
 
 AGENT_NAMES = [
     ("Drafting", "Authors and edits the initial document draft."),
@@ -77,6 +95,18 @@ async def main() -> None:
         agent = await agent_service.create_agent(organization.id, name, description)
         agents_by_name[name] = agent
     print(f"Created {len(agents_by_name)} agents")
+
+    roles_by_name = {}
+    for name, description, linked_agent in ROLE_DEFINITIONS:
+        agent_id = agents_by_name[linked_agent].id if linked_agent else None
+        role = await role_service.create_role(organization.id, name, description, agent_id)
+        roles_by_name[name] = role
+    print(f"Created {len(roles_by_name)} roles")
+
+    print("Created users (email / password):")
+    for name, email, password, role_name in USER_DEFINITIONS:
+        await user_service.create_user(organization.id, name, email, password, roles_by_name[role_name].id)
+        print(f"  {email} / {password}  ({role_name})")
 
     definition = await workflow_service.create_definition(
         organization.id,

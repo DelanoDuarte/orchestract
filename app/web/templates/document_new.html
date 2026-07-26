@@ -32,10 +32,6 @@
           {% for wf in workflows %}<option value="{{ wf.id }}">{{ wf.name }}</option>{% endfor %}
         </select>
       </div>
-      <div role="group" class="field">
-        <label for="doc-actor">Your name</label>
-        <input id="doc-actor" type="text" name="actor" required>
-      </div>
       <button type="submit" class="btn w-full">Create &amp; start workflow</button>
     </form>
     {% else %}

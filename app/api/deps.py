@@ -1,14 +1,28 @@
-from fastapi import Header
+from fastapi import Depends, Header, Request
 
 from app.application.agent_service import AgentService
 from app.application.document_service import DocumentService
 from app.application.organization_service import OrganizationService
+from app.application.role_service import RoleService
 from app.application.storage_service import StorageService
+from app.application.user_service import UserService
 from app.application.workflow_service import WorkflowService
 from app.domain.shared.exceptions import NotFoundError
 from app.domain.tenancy.models import Organization
+from app.domain.users.models import User
 from app.infrastructure.db.session import async_session_factory
 from app.infrastructure.db.unit_of_work import UnitOfWork
+
+SESSION_COOKIE_NAME = "session_token"
+
+
+class NotAuthenticatedError(Exception):
+    """Raised when a web request has no valid session. Maps (via a
+    dedicated exception handler in main.py) to a redirect to /login,
+    rather than the JSON error body other DomainErrors get."""
+
+    def __init__(self, next_path: str = "/") -> None:
+        self.next_path = next_path
 
 
 def uow_factory() -> UnitOfWork:
@@ -20,6 +34,8 @@ agent_service = AgentService(uow_factory)
 workflow_service = WorkflowService(uow_factory)
 storage_service = StorageService(uow_factory)
 document_service = DocumentService(uow_factory, storage_service)
+role_service = RoleService(uow_factory)
+user_service = UserService(uow_factory)
 
 
 def get_organization_service() -> OrganizationService:
@@ -54,3 +70,37 @@ async def get_current_organization_from_header(
 
 async def get_current_organization_from_path(org_slug: str) -> Organization:
     return await organization_service.get_by_slug(org_slug)
+
+
+async def enforce_login_and_membership(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+) -> None:
+    """Router-level dependency for every org-scoped web route: requires a
+    valid session belonging to a user of *this* organization, and stashes
+    the user on `request.state.current_user` so templates/routes can read
+    it without every route re-declaring it as a parameter."""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    user = await user_service.get_user_by_session_token(token) if token else None
+    if user is None:
+        raise NotAuthenticatedError(next_path=str(request.url.path))
+    if user.organization_id != organization.id:
+        raise NotAuthenticatedError(next_path=f"/{organization.slug}/")
+    request.state.current_user = user
+    request.state.current_role = await role_service.get(user.role_id)
+
+
+def current_user_dep(request: Request) -> User:
+    """For the handful of routes that need the logged-in User object in
+    Python (permission checks, auto-filling 'actor'). Only valid on routes
+    behind `enforce_login_and_membership`."""
+    return request.state.current_user
+
+
+def current_user_for_template(request: Request) -> User | None:
+    """Jinja global so base.html can show 'signed in as ...' without every
+    route passing it through the template context explicitly."""
+    return getattr(request.state, "current_user", None)
+
+
+def current_role_for_template(request: Request):
+    return getattr(request.state, "current_role", None)

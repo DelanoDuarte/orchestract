@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ agent.name }}{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">Edit agent</h1>
+  <p class="text-sm text-muted-foreground">{{ agent.name }}</p>
+</div>
+
+{% if error %}
+<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+{% endif %}
+
+<div class="card mx-auto max-w-lg" data-size="sm">
+  <section>
+    <form method="post" action="/{{ organization.slug }}/agents/{{ agent.id }}/edit" class="flex flex-col gap-4">
+      <div role="group" class="field">
+        <label for="agent-name">Name</label>
+        <input id="agent-name" type="text" name="name" value="{{ agent.name }}" required>
+      </div>
+      <div role="group" class="field">
+        <label for="agent-description">Description</label>
+        <input id="agent-description" type="text" name="description" value="{{ agent.description or "" }}">
+      </div>
+      {% if roles %}
+      <div role="group" class="field">
+        <label>Linked roles</label>
+        <div class="flex flex-col gap-2">
+          {% for role in roles %}
+          <label class="flex items-center gap-2 text-sm font-normal">
+            <input type="checkbox" name="role_ids" value="{{ role.id }}" {% if role.agent_id == agent.id %}checked{% endif %}>
+            {{ role.name }}
+            {% if role.agent_id and role.agent_id != agent.id %}<span class="text-xs text-muted-foreground">(currently on {{ agent_names.get(role.agent_id, "agent #" ~ role.agent_id) }})</span>{% endif %}
+          </label>
+          {% endfor %}
+        </div>
+        <p>Checked roles will be the only ones that can act on this agent's workflow steps. Leave all unchecked to keep it open to anyone.</p>
+      </div>
+      {% endif %}
+      <button type="submit" class="btn w-full">Save changes</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

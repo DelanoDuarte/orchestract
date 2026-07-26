@@ -164,16 +164,46 @@ async def _steps_owned_by_agent(organization_id: int) -> dict[int, int]:
     return counts
 
 
+async def _roles_by_agent(organization_id: int) -> dict[int, list[str]]:
+    roles = await role_service.list_roles(organization_id)
+    by_agent: dict[int, list[str]] = {}
+    for role in roles:
+        if role.agent_id is not None:
+            by_agent.setdefault(role.agent_id, []).append(role.name)
+    return by_agent
+
+
+async def _reconcile_agent_roles(organization_id: int, agent_id: int, selected_role_ids: list[int]) -> None:
+    """Applies the "Linked roles" checklist from the agent create/edit form:
+    checked roles get linked to this agent (taking them off whatever agent
+    they were on, if any), and roles that were linked to this agent but got
+    unchecked are unlinked. Roles linked to a *different* agent that stay
+    unchecked are left alone."""
+    selected = set(selected_role_ids)
+    for role in await role_service.list_roles(organization_id):
+        if role.id in selected and role.agent_id != agent_id:
+            await role_service.set_agent(role.id, agent_id)
+        elif role.id not in selected and role.agent_id == agent_id:
+            await role_service.set_agent(role.id, None)
+
+
 @org_router.get("/agents")
 async def agents_page(
     request: Request, organization: Organization = Depends(get_current_organization_from_path)
 ):
     agents = await agent_service.list_agents(organization.id)
     steps_owned = await _steps_owned_by_agent(organization.id)
+    roles_by_agent = await _roles_by_agent(organization.id)
     return templates.TemplateResponse(
         request,
         "agents.html",
-        {"organization": organization, "agents": agents, "steps_owned": steps_owned, "active_nav": "agents"},
+        {
+            "organization": organization,
+            "agents": agents,
+            "steps_owned": steps_owned,
+            "roles_by_agent": roles_by_agent,
+            "active_nav": "agents",
+        },
     )
 
 
@@ -181,10 +211,12 @@ async def agents_page(
 async def new_agent_page(
     request: Request, organization: Organization = Depends(get_current_organization_from_path)
 ):
+    roles = await role_service.list_roles(organization.id)
+    agent_names = await _agent_names(organization.id)
     return templates.TemplateResponse(
         request,
         "agent_new.html",
-        {"organization": organization, "active_nav": "agents"},
+        {"organization": organization, "roles": roles, "agent_names": agent_names, "active_nav": "agents"},
     )
 
 
@@ -193,16 +225,76 @@ async def create_agent(
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
+    role_ids: list[int] = Form([]),
     organization: Organization = Depends(get_current_organization_from_path),
 ):
     try:
-        await agent_service.create_agent(organization.id, name, description or None)
+        agent = await agent_service.create_agent(organization.id, name, description or None)
+        await _reconcile_agent_roles(organization.id, agent.id, role_ids)
     except DomainError as exc:
+        roles = await role_service.list_roles(organization.id)
+        agent_names = await _agent_names(organization.id)
         return templates.TemplateResponse(
             request,
             "agent_new.html",
             {
                 "organization": organization,
+                "roles": roles,
+                "agent_names": agent_names,
+                "active_nav": "agents",
+                "error": str(exc),
+            },
+            status_code=422,
+        )
+    return await agents_page(request, organization)
+
+
+@org_router.get("/agents/{agent_id}/edit")
+async def edit_agent_page(
+    agent_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    agent = await agent_service.get(agent_id)
+    roles = await role_service.list_roles(organization.id)
+    agent_names = await _agent_names(organization.id)
+    return templates.TemplateResponse(
+        request,
+        "agent_edit.html",
+        {
+            "organization": organization,
+            "agent": agent,
+            "roles": roles,
+            "agent_names": agent_names,
+            "active_nav": "agents",
+        },
+    )
+
+
+@org_router.post("/agents/{agent_id}/edit")
+async def update_agent(
+    agent_id: int,
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    role_ids: list[int] = Form([]),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        agent = await agent_service.update(agent_id, name, description or None)
+        await _reconcile_agent_roles(organization.id, agent_id, role_ids)
+    except DomainError as exc:
+        agent = await agent_service.get(agent_id)
+        roles = await role_service.list_roles(organization.id)
+        agent_names = await _agent_names(organization.id)
+        return templates.TemplateResponse(
+            request,
+            "agent_edit.html",
+            {
+                "organization": organization,
+                "agent": agent,
+                "roles": roles,
+                "agent_names": agent_names,
                 "active_nav": "agents",
                 "error": str(exc),
             },
@@ -624,7 +716,7 @@ async def create_document(
             },
             status_code=422,
         )
-    return await document_detail(document.id, request, organization)
+    return await document_detail(document.id, request, organization, current_user)
 
 
 async def _document_detail_context(organization: Organization, document_id: int, current_user: User) -> dict:

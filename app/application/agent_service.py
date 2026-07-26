@@ -36,6 +36,16 @@ class AgentService:
             await uow.commit()
             return agent
 
+    async def update(self, agent_id: int, name: str, description: str | None) -> Agent:
+        async with self._uow_factory() as uow:
+            agent = await uow.agents.get(agent_id)
+            if agent is None:
+                raise NotFoundError(f"agent {agent_id} not found")
+            agent.rename(name)
+            agent.set_description(description)
+            await uow.commit()
+            return agent
+
     async def set_active(self, agent_id: int, active: bool) -> Agent:
         async with self._uow_factory() as uow:
             agent = await uow.agents.get(agent_id)

@@ -47,6 +47,9 @@ class Agent(Base):
         self.name = new_name
         self.slug = slugify(new_name)
 
+    def set_description(self, description: str | None) -> None:
+        self.description = description
+
     def deactivate(self) -> None:
         self.is_active = False
 

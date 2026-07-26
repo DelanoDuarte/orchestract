@@ -21,6 +21,21 @@
         <label for="agent-description">Description</label>
         <input id="agent-description" type="text" name="description">
       </div>
+      {% if roles %}
+      <div role="group" class="field">
+        <label>Linked roles</label>
+        <div class="flex flex-col gap-2">
+          {% for role in roles %}
+          <label class="flex items-center gap-2 text-sm font-normal">
+            <input type="checkbox" name="role_ids" value="{{ role.id }}">
+            {{ role.name }}
+            {% if role.agent_id %}<span class="text-xs text-muted-foreground">(currently on {{ agent_names.get(role.agent_id, "agent #" ~ role.agent_id) }})</span>{% endif %}
+          </label>
+          {% endfor %}
+        </div>
+        <p>Checked roles will be the only ones that can act on this agent's workflow steps.</p>
+      </div>
+      {% endif %}
       <button type="submit" class="btn w-full">Create agent</button>
     </form>
   </section>

@@ -1,47 +1,61 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}Account{% endblock %}
 {% block content %}
-<h1 class="mb-6 text-2xl font-semibold tracking-tight">Account</h1>
+<div class="page reveal">
+  {% call macros.page_header("Account", "Manage your profile and password.", eyebrow="Settings") %}{% endcall %}
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
-{% endif %}
-{% if success %}
-<div class="alert mb-6"><section>{{ success }}</section></div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
+  {% if success %}
+  <div class="alert mb-6"><section>{{ success }}</section></div>
+  {% endif %}
 
-<div class="grid gap-6 lg:grid-cols-2">
-  <div class="card" data-size="sm">
-    <header>
-      <h2>Profile</h2>
-      <p>{{ current_user_obj.email }} &middot; {{ current_role_obj.name if current_role_obj else "No role" }}</p>
-    </header>
-    <section>
-      <form method="post" action="/{{ organization.slug }}/account" class="flex flex-col gap-4">
-        <div role="group" class="field">
-          <label for="account-name">Name</label>
-          <input id="account-name" type="text" name="name" required value="{{ current_user_obj.name }}">
-        </div>
-        <button type="submit" class="btn self-start" data-size="sm">Save name</button>
-      </form>
-    </section>
+  <div class="mb-6 flex items-center gap-4 rounded-[var(--radius-lg)] border border-border bg-card p-5">
+    <span class="grid size-14 flex-none place-items-center rounded-full bg-primary/15 text-lg font-semibold text-primary">{{ current_user_obj.name[:2]|upper }}</span>
+    <div class="min-w-0">
+      <p class="text-lg font-semibold">{{ current_user_obj.name }}</p>
+      <p class="text-sm text-muted-foreground">{{ current_user_obj.email }} · {{ current_role_obj.name if current_role_obj else "No role" }}</p>
+    </div>
   </div>
 
-  <div class="card" data-size="sm">
-    <header><h2>Password</h2></header>
-    <section>
-      <form method="post" action="/{{ organization.slug }}/account/password" class="flex flex-col gap-4">
-        <div role="group" class="field">
-          <label for="account-current-password">Current password</label>
-          <input id="account-current-password" type="password" name="current_password" required>
-        </div>
-        <div role="group" class="field">
-          <label for="account-new-password">New password</label>
-          <input id="account-new-password" type="password" name="new_password" required minlength="8">
-        </div>
-        <button type="submit" class="btn self-start" data-size="sm">Change password</button>
-      </form>
-    </section>
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div class="card">
+      <header class="border-b border-border px-4 py-3">
+        <h2 class="section-title">Profile</h2>
+        <p class="text-sm text-muted-foreground">Update your display name.</p>
+      </header>
+      <section class="p-4">
+        <form method="post" action="/{{ organization.slug }}/account" class="flex flex-col gap-4">
+          <div role="group" class="field">
+            <label for="account-name">Name</label>
+            <input id="account-name" type="text" name="name" required value="{{ current_user_obj.name }}">
+          </div>
+          <button type="submit" class="btn self-start" data-size="sm">Save name</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="card">
+      <header class="border-b border-border px-4 py-3">
+        <h2 class="section-title">Password</h2>
+        <p class="text-sm text-muted-foreground">Choose a strong, unique password.</p>
+      </header>
+      <section class="p-4">
+        <form method="post" action="/{{ organization.slug }}/account/password" class="flex flex-col gap-4">
+          <div role="group" class="field">
+            <label for="account-current-password">Current password</label>
+            <input id="account-current-password" type="password" name="current_password" required>
+          </div>
+          <div role="group" class="field">
+            <label for="account-new-password">New password</label>
+            <input id="account-new-password" type="password" name="new_password" required minlength="8">
+          </div>
+          <button type="submit" class="btn self-start" data-size="sm">Change password</button>
+        </form>
+      </section>
+    </div>
   </div>
 </div>
 {% endblock %}

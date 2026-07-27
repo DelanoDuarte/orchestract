@@ -2,62 +2,70 @@
 {% import "_macros.html" as macros %}
 {% block title %}Contracts{% endblock %}
 {% block content %}
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <div>
-    <h1 class="text-2xl font-semibold tracking-tight">Contracts</h1>
-    <p class="text-sm text-muted-foreground">Every contract being orchestrated in this organization.</p>
+<div class="page reveal">
+  {% call macros.page_header("Contracts", "Every contract being orchestrated in this organization.", eyebrow="Workspace") %}
+    <a href="/{{ organization.slug }}/contracts/new" class="btn">
+      {{ icon('plus', 'size-4') }}<span>New contract</span>
+    </a>
+  {% endcall %}
+
+  <div class="mb-4 flex flex-wrap items-center gap-2.5">
+    <form method="get" class="relative min-w-56 flex-1">
+      {% if active_type %}<input type="hidden" name="contract_type" value="{{ active_type }}">{% endif %}
+      <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-muted-foreground">
+        {{ icon('search', 'size-3.5') }}
+      </span>
+      <input type="search" name="q" value="{{ search_query }}" placeholder="Search contracts..." class="input pl-8">
+    </form>
+    <div class="flex flex-wrap items-center gap-1.5">
+      <a href="/{{ organization.slug }}/contracts{{ "?q=" ~ search_query if search_query else "" }}"
+         class="badge {{ "badge-primary" if not active_type else "" }}"
+         {% if active_type %}data-variant="outline"{% endif %}>All</a>
+      {% for t in contract_types %}
+      <a href="/{{ organization.slug }}/contracts?contract_type={{ t }}{{ "&q=" ~ search_query if search_query else "" }}"
+         class="badge {{ "badge-primary" if active_type == t else "" }}"
+         {% if active_type != t %}data-variant="outline"{% endif %}>{{ t }}</a>
+      {% endfor %}
+    </div>
   </div>
-  <a href="/{{ organization.slug }}/contracts/new" class="btn">
-    {{ icon('plus', 'size-4') }}<span>New contract</span>
-  </a>
-</div>
 
-<div class="mb-4 flex flex-wrap items-center gap-2.5">
-  <form method="get" class="relative min-w-56 flex-1">
-    {% if active_type %}<input type="hidden" name="contract_type" value="{{ active_type }}">{% endif %}
-    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-muted-foreground">
-      {{ icon('search', 'size-3.5') }}
-    </span>
-    <input type="search" name="q" value="{{ search_query }}" placeholder="Search contracts..." class="input pl-8">
-  </form>
-  <a href="/{{ organization.slug }}/contracts{{ "?q=" ~ search_query if search_query else "" }}"
-     class="badge {{ "border-transparent bg-primary/15 text-primary" if not active_type else "" }}"
-     {% if active_type %}data-variant="outline"{% endif %}>All</a>
-  {% for t in contract_types %}
-  <a href="/{{ organization.slug }}/contracts?contract_type={{ t }}{{ "&q=" ~ search_query if search_query else "" }}"
-     class="badge {{ "border-transparent bg-primary/15 text-primary" if active_type == t else "" }}"
-     {% if active_type != t %}data-variant="outline"{% endif %}>{{ t }}</a>
-  {% endfor %}
-</div>
-
-<div class="card" data-size="sm">
-  <div class="table-container">
-    <table class="table">
-      <thead>
-        <tr><th>Title</th><th>Type</th><th>Documents</th><th>Updated</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr>
-          <td class="font-medium">{{ row.contract.title }}</td>
-          <td>{{ row.contract.contract_type }}</td>
-          <td>{{ row.contract.documents|length }}</td>
-          <td class="text-muted-foreground">{{ row.contract.updated_at.strftime("%Y-%m-%d %H:%M") }}</td>
-          <td class="text-end">
-            <button type="button" class="btn" data-variant="ghost" data-size="sm"
-                    onclick="document.getElementById('preview-{{ row.contract.id }}').showModal()">
-              {{ icon('layers', 'size-4') }}<span>Preview</span>
-            </button>
-            <a href="/{{ organization.slug }}/contracts/{{ row.contract.id }}" class="btn" data-variant="ghost" data-size="sm">
-              View{{ icon('chevron-right', 'size-4') }}
-            </a>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="5" class="text-center text-muted-foreground">No contracts yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="card">
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr><th>Title</th><th>Type</th><th>Documents</th><th>Updated</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="font-medium">{{ row.contract.title }}</td>
+            <td class="text-muted-foreground">{{ row.contract.contract_type }}</td>
+            <td class="text-muted-foreground tabular-nums">{{ row.contract.documents|length }}</td>
+            <td class="text-muted-foreground tabular-nums">{{ row.contract.updated_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td class="text-end">
+              <button type="button" class="btn" data-variant="ghost" data-size="sm" hx-boost="false"
+                      onclick="document.getElementById('preview-{{ row.contract.id }}').showModal()">
+                {{ icon('layers', 'size-4') }}<span class="hidden sm:inline">Preview</span>
+              </button>
+              <a href="/{{ organization.slug }}/contracts/{{ row.contract.id }}" class="btn" data-variant="ghost" data-size="sm">
+                View{{ icon('chevron-right', 'size-4') }}
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="p-0">
+            {% if search_query or active_type %}
+            {{ macros.empty_state('search', 'No matches', 'No contracts match your search or filter.') }}
+            {% else %}
+            {% call macros.empty_state('file-text', 'No contracts yet', 'Create your first contract to start orchestrating its workflow.') %}
+              <a href="/{{ organization.slug }}/contracts/new" class="btn" data-size="sm">{{ icon('plus', 'size-4') }}<span>New contract</span></a>
+            {% endcall %}
+            {% endif %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -75,9 +83,9 @@
           Current step: <span class="font-medium">{{ row.step_name }}</span> · {{ row.agent_name }}
         </span>
         {% if row.status == "active" %}
-        <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
+        <span class="badge badge-success">Active</span>
         {% else %}
-        <span class="badge" data-variant="secondary">Completed</span>
+        <span class="badge badge-muted">Completed</span>
         {% endif %}
       </div>
       {{ macros.step_pipeline(row.definition.steps, row.instance.current_step_key) }}

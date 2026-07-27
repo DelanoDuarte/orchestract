@@ -1,22 +1,28 @@
 {% extends "base.html" %}
 {% block title %}New contract{% endblock %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-semibold tracking-tight">New contract</h1>
-  <p class="text-sm text-muted-foreground">Starts running through the workflow you pick immediately.</p>
-</div>
+<div class="page-narrow reveal">
+  <a href="/{{ organization.slug }}/contracts" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    {{ icon('arrow-right', 'size-4 rotate-180') }}<span>All contracts</span>
+  </a>
+  <div class="mb-6 flex items-start gap-3">
+    <span class="icon-chip">{{ icon('file-text', 'size-5') }}</span>
+    <div class="space-y-1">
+      <h1 class="page-title">New contract</h1>
+      <p class="text-sm text-muted-foreground">Starts running through the workflow you pick immediately.</p>
+    </div>
+  </div>
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
 
-<div class="card mx-auto max-w-lg" data-size="sm">
-  <section>
+  <div class="card p-6">
     {% if workflows %}
     <form method="post" action="/{{ organization.slug }}/contracts" class="flex flex-col gap-4">
       <div role="group" class="field">
         <label for="contract-title">Title</label>
-        <input id="contract-title" type="text" name="title" required>
+        <input id="contract-title" type="text" name="title" required placeholder="e.g. Vendor Services Agreement">
       </div>
       <div role="group" class="field">
         <label for="contract-type">Type</label>
@@ -24,7 +30,7 @@
       </div>
       <div role="group" class="field">
         <label for="contract-description">Description</label>
-        <input id="contract-description" type="text" name="description">
+        <input id="contract-description" type="text" name="description" placeholder="Optional">
       </div>
       <div role="group" class="field">
         <label for="contract-workflow">Workflow</label>
@@ -35,11 +41,13 @@
       <button type="submit" class="btn w-full">Create &amp; start workflow</button>
     </form>
     {% else %}
-    <p class="text-sm text-muted-foreground">
-      No active workflows yet —
-      <a class="underline" href="/{{ organization.slug }}/workflows">activate one first</a>.
-    </p>
+    <div class="empty-state">
+      <span class="icon-chip">{{ icon('git-branch', 'size-5') }}</span>
+      <p class="font-medium text-foreground">No active workflows yet</p>
+      <p class="max-w-sm text-sm">You need an active workflow before creating a contract.</p>
+      <a href="/{{ organization.slug }}/workflows" class="btn mt-2" data-size="sm">Go to workflows</a>
+    </div>
     {% endif %}
-  </section>
+  </div>
 </div>
 {% endblock %}

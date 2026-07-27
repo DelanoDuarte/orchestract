@@ -1,80 +1,393 @@
-/* Orchestract palette on top of Basecoat's shadcn-compatible tokens:
-   a deep teal/charcoal dark theme with an amber accent, matching
-   docs/inspirations. Brand hue (primary/accent/ring) is shared across
-   light and dark; background/card/sidebar are only reworked for dark
-   since the product is designed dark-first. */
+/* ============================================================================
+   Orchestract design system
+   ----------------------------------------------------------------------------
+   A dark-first, teal/charcoal SaaS theme with an amber/lime accent, layered on
+   Basecoat's shadcn-compatible CSS variables and component classes
+   (.btn, .card, .badge, .sidebar, .field, .table, .input, .alert, .dialog).
+
+   Structure:
+     1. Design tokens (color, radius, elevation, motion) — light + dark
+     2. Global base (typography, ambient backdrop, selection, scrollbars)
+     3. App shell (sidebar, header, page container)
+     4. Components (cards, buttons, badges, tables, inputs, dialogs, tabs)
+     5. Domain visuals (lifecycle pipeline, agent cards, stat cards)
+     6. Motion (view transitions, htmx swaps, reveal-on-load)
+   ========================================================================== */
+
+/* 1. ---------------------------------------------------------------- TOKENS */
 
 :root {
-  --radius: 0.75rem;
+  --radius: 0.7rem;
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-lg: calc(var(--radius) + 0.25rem);
+  --radius-xl: calc(var(--radius) + 0.5rem);
+
+  /* Brand hue is shared across light and dark. */
   --primary: oklch(0.6 0.14 165);
   --primary-foreground: oklch(0.98 0.01 165);
   --accent: oklch(0.78 0.14 70);
   --accent-foreground: oklch(0.22 0.03 70);
   --ring: oklch(0.72 0.13 70);
+
+  /* Elevation — soft, layered shadows tuned for both themes. */
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 6%);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 8%), 0 1px 2px oklch(0 0 0 / 6%);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 10%), 0 2px 4px oklch(0 0 0 / 6%);
+  --shadow-lg: 0 12px 32px oklch(0 0 0 / 14%), 0 4px 8px oklch(0 0 0 / 8%);
+  --shadow-glow: 0 0 0 1px oklch(0.72 0.15 165 / 20%), 0 8px 30px oklch(0.6 0.12 165 / 12%);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 .dark {
   --background: oklch(0.16 0.016 175);
   --foreground: oklch(0.95 0.01 175);
-  --card: oklch(0.205 0.018 175);
+  --card: oklch(0.208 0.018 175);
   --card-foreground: oklch(0.95 0.01 175);
   --popover: oklch(0.205 0.018 175);
   --popover-foreground: oklch(0.95 0.01 175);
-  --primary: oklch(0.72 0.15 165);
+  --primary: oklch(0.74 0.15 165);
   --primary-foreground: oklch(0.16 0.02 165);
   --secondary: oklch(0.275 0.02 175);
   --secondary-foreground: oklch(0.95 0.01 175);
   --muted: oklch(0.24 0.016 175);
-  --muted-foreground: oklch(0.66 0.02 175);
-  --accent: oklch(0.78 0.14 70);
+  --muted-foreground: oklch(0.67 0.02 175);
+  --accent: oklch(0.79 0.14 70);
   --accent-foreground: oklch(0.2 0.03 70);
   --destructive: oklch(0.68 0.19 25);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.78 0.14 70);
-  --sidebar: oklch(0.13 0.015 175);
+  --success: oklch(0.72 0.16 155);
+  --warning: oklch(0.8 0.14 70);
+  --border: oklch(1 0 0 / 9%);
+  --border-strong: oklch(1 0 0 / 16%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.79 0.14 70);
+  --sidebar: oklch(0.132 0.015 175);
   --sidebar-foreground: oklch(0.9 0.01 175);
-  --sidebar-primary: oklch(0.72 0.15 165);
+  --sidebar-primary: oklch(0.74 0.15 165);
   --sidebar-primary-foreground: oklch(0.16 0.02 165);
-  --sidebar-accent: oklch(0.3 0.03 70 / 25%);
-  --sidebar-accent-foreground: oklch(0.95 0.01 175);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.78 0.14 70);
+  --sidebar-accent: oklch(0.3 0.03 165 / 22%);
+  --sidebar-accent-foreground: oklch(0.97 0.01 175);
+  --sidebar-border: oklch(1 0 0 / 7%);
+  --sidebar-ring: oklch(0.79 0.14 70);
+
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 30%);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 40%), 0 1px 2px oklch(0 0 0 / 30%);
+  --shadow-md: 0 6px 16px oklch(0 0 0 / 45%), 0 2px 6px oklch(0 0 0 / 35%);
+  --shadow-lg: 0 18px 44px oklch(0 0 0 / 55%), 0 6px 14px oklch(0 0 0 / 40%);
+  --shadow-glow: 0 0 0 1px oklch(0.74 0.15 165 / 25%), 0 10px 40px oklch(0.6 0.12 165 / 18%);
 }
 
-.dark body {
-  background-image: radial-gradient(circle at 12% -10%, oklch(0.4 0.06 165 / 20%), transparent 55%);
+/* Light mode is refined for parity even though the product is dark-first. */
+:root:not(.dark) {
+  --background: oklch(0.99 0.004 175);
+  --foreground: oklch(0.2 0.02 175);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.02 175);
+  --muted: oklch(0.97 0.005 175);
+  --muted-foreground: oklch(0.5 0.02 175);
+  --secondary: oklch(0.96 0.008 175);
+  --secondary-foreground: oklch(0.24 0.02 175);
+  --border: oklch(0.2 0.02 175 / 10%);
+  --border-strong: oklch(0.2 0.02 175 / 18%);
+  --input: oklch(0.2 0.02 175 / 15%);
+  --success: oklch(0.6 0.15 155);
+  --warning: oklch(0.72 0.14 70);
+  --sidebar: oklch(0.985 0.004 175);
+  --sidebar-foreground: oklch(0.24 0.02 175);
+  --sidebar-accent: oklch(0.6 0.1 165 / 12%);
+  --sidebar-accent-foreground: oklch(0.2 0.03 165);
+  --sidebar-border: oklch(0.2 0.02 175 / 8%);
+}
+
+/* 2. ------------------------------------------------------------ GLOBAL BASE */
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.006em;
+}
+
+/* Ambient, layered backdrop — a soft green glow from the top plus a faint
+   amber wash from the bottom, echoing docs/inspirations. */
+body {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(1100px 620px at 8% -8%, oklch(0.45 0.08 165 / 18%), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, oklch(0.5 0.09 70 / 8%), transparent 55%);
   background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
-/* Horizontal lifecycle pipeline banner (workflow builder + document detail) */
-.step-pipeline {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  overflow-x: auto;
-  padding: 0.25rem;
+:root:not(.dark) body {
+  background-image:
+    radial-gradient(1100px 620px at 8% -8%, oklch(0.7 0.1 165 / 12%), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, oklch(0.8 0.09 70 / 8%), transparent 55%);
 }
 
-.step-pill {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.375rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid transparent;
-  padding: 0.75rem 1rem;
+::selection {
+  background: oklch(0.74 0.15 165 / 30%);
+}
+
+/* Tabular numerals for metrics. */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Custom scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); background-clip: content-box; }
+
+/* Consistent, brand-tinted focus rings. */
+:where(a, button, [role="button"], input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Typographic rhythm helpers used across pages. */
+.page-title { font-size: 1.5rem; line-height: 1.15; font-weight: 650; letter-spacing: -0.02em; }
+.section-title { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+.eyebrow {
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--muted-foreground);
 }
 
+/* 3. ------------------------------------------------------------- APP SHELL */
+
+.app-shell { display: flex; min-height: 100svh; }
+
+/* Sidebar polish. */
+.sidebar {
+  background: linear-gradient(180deg, var(--sidebar), color-mix(in oklch, var(--sidebar) 90%, black));
+  border-right: 1px solid var(--sidebar-border);
+}
+.sidebar nav { display: flex; flex-direction: column; height: 100%; }
+.sidebar nav > section { flex: 1; }
+.sidebar h3 {
+  font-size: 0.66rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--muted-foreground); padding: 0 0.5rem; margin-bottom: 0.25rem;
+}
+.sidebar nav ul { display: flex; flex-direction: column; gap: 2px; }
+.sidebar nav ul li a {
+  position: relative;
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem; font-weight: 500;
+  color: var(--sidebar-foreground);
+  transition: background-color .15s var(--ease-out), color .15s var(--ease-out);
+}
+.sidebar nav ul li a svg { opacity: 0.75; transition: opacity .15s var(--ease-out); flex: none; }
+.sidebar nav ul li a:hover { background-color: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
+.sidebar nav ul li a:hover svg { opacity: 1; }
+.sidebar nav ul li a[aria-current="page"] {
+  background-color: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+  font-weight: 600;
+}
+.sidebar nav ul li a[aria-current="page"] svg { opacity: 1; color: var(--sidebar-primary); }
+.sidebar nav ul li a[aria-current="page"]::before {
+  content: ""; position: absolute; left: -0.5rem; top: 50%; transform: translateY(-50%);
+  height: 1.1rem; width: 3px; border-radius: 0 3px 3px 0; background: var(--sidebar-primary);
+}
+
+/* Brand lockup. */
+.brand { display: inline-flex; align-items: center; gap: 0.55rem; font-weight: 650; letter-spacing: -0.02em; }
+.brand .brand-mark {
+  display: grid; place-items: center; height: 1.85rem; width: 1.85rem; flex: none;
+  border-radius: var(--radius-sm);
+  color: var(--primary-foreground);
+  background: linear-gradient(140deg, var(--primary), oklch(0.7 0.15 145));
+  box-shadow: var(--shadow-sm);
+}
+
+/* Sticky, blurred app header. */
+.app-header {
+  position: sticky; top: 0; z-index: 30;
+  backdrop-filter: saturate(140%) blur(10px);
+  background: color-mix(in oklch, var(--background) 82%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Consistent page container. */
+.page { width: 100%; max-width: 80rem; margin-inline: auto; }
+.page-narrow { width: 100%; max-width: 42rem; margin-inline: auto; }
+
+/* 4. ------------------------------------------------------------ COMPONENTS */
+
+/* Cards: crisper border, soft elevation, gentle hover lift where interactive. */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.card-hover { transition: transform .18s var(--ease-out), box-shadow .18s var(--ease-out), border-color .18s var(--ease-out); }
+.card-hover:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+
+/* A subtle gradient "surface" panel used for heroes / callouts. */
+.surface-gradient {
+  background:
+    radial-gradient(120% 140% at 0% 0%, oklch(0.4 0.07 165 / 22%), transparent 55%),
+    var(--card);
+  border: 1px solid var(--border);
+}
+
+/* Buttons: tighter motion + elevation on primary. */
+.btn { transition: transform .12s var(--ease-out), box-shadow .15s var(--ease-out), background-color .15s var(--ease-out), color .15s var(--ease-out); font-weight: 550; }
+.btn:active { transform: translateY(0.5px) scale(0.99); }
+.btn:not([data-variant]):not([data-variant="ghost"]):not([data-variant="outline"]):not([data-variant="secondary"]) {
+  box-shadow: var(--shadow-xs);
+}
+.btn:not([data-variant]):hover { box-shadow: var(--shadow-sm); }
+
+/* Badges: pill radius + medium weight. */
+.badge { border-radius: 999px; font-weight: 550; }
+.badge-success { border-color: transparent; background: color-mix(in oklch, var(--success) 18%, transparent); color: var(--success); }
+.badge-warning { border-color: transparent; background: color-mix(in oklch, var(--warning) 18%, transparent); color: var(--warning); }
+.badge-primary { border-color: transparent; background: color-mix(in oklch, var(--primary) 16%, transparent); color: var(--primary); }
+.badge-muted   { border-color: transparent; background: var(--muted); color: var(--muted-foreground); }
+
+/* Live status dot. */
+.status-dot { display: inline-block; height: 0.5rem; width: 0.5rem; border-radius: 999px; background: var(--success); box-shadow: 0 0 0 3px color-mix(in oklch, var(--success) 25%, transparent); }
+.status-dot[data-tone="muted"] { background: var(--muted-foreground); box-shadow: none; }
+
+/* Tables: airier rows, hover feedback, sticky header. */
+.table { border-collapse: separate; border-spacing: 0; }
+.table thead th {
+  position: sticky; top: 0;
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--card) 92%, transparent);
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.table tbody td { padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.table tbody tr { transition: background-color .12s var(--ease-out); }
+.table tbody tr:hover { background: color-mix(in oklch, var(--muted) 55%, transparent); }
+.table tbody tr:last-child td { border-bottom: 0; }
+
+/* Inputs: refined focus + hover. */
+.input, .field input, .field select, .field textarea, textarea, select {
+  transition: border-color .15s var(--ease-out), box-shadow .15s var(--ease-out), background-color .15s var(--ease-out);
+}
+.input:hover, .field input:hover, .field select:hover, .field textarea:hover { border-color: var(--border-strong); }
+.input:focus, .field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 22%, transparent);
+}
+.field label { font-weight: 550; font-size: 0.85rem; }
+
+/* Dialogs: stronger elevation + entrance. */
+.dialog article, dialog.dialog article { box-shadow: var(--shadow-lg); border-radius: var(--radius-lg); }
+dialog[open] { animation: dialog-in .22s var(--ease-out); }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
+dialog::backdrop { background: oklch(0 0 0 / 55%); backdrop-filter: blur(2px); }
+
+/* Alerts: rounded + subtle. */
+.alert { border-radius: var(--radius); }
+
+/* Divider label ("or"). */
+.divider-label { display: flex; align-items: center; gap: 0.75rem; color: var(--muted-foreground); font-size: 0.8rem; }
+.divider-label::before, .divider-label::after { content: ""; height: 1px; flex: 1; background: var(--border); }
+
+/* 5. -------------------------------------------------------- DOMAIN VISUALS */
+
+/* Stat cards. */
+.stat-card { position: relative; overflow: hidden; }
+.stat-card::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 120% at 100% 0%, oklch(0.6 0.12 165 / 10%), transparent 60%);
+}
+.stat-value { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+
+/* Horizontal lifecycle pipeline (workflow builder + contract/document detail). */
+.step-pipeline { display: flex; align-items: center; gap: 0.35rem; overflow-x: auto; padding: 0.35rem; }
+.step-pill {
+  display: flex; flex: none; flex-direction: column; align-items: center; gap: 0.4rem;
+  border-radius: var(--radius); border: 1px solid var(--border);
+  padding: 0.7rem 1rem; min-width: 5.5rem;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--card) 60%, transparent);
+  transition: border-color .18s var(--ease-out), color .18s var(--ease-out), background-color .18s var(--ease-out);
+}
+.step-pill:hover { border-color: var(--border-strong); }
 .step-pill[data-current="true"] {
   border-color: var(--accent);
-  background-color: color-mix(in oklch, var(--accent) 15%, transparent);
+  background-color: color-mix(in oklch, var(--accent) 14%, transparent);
   color: var(--foreground);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--accent) 30%, transparent);
+}
+.step-pill[data-done="true"] { color: var(--foreground); border-color: color-mix(in oklch, var(--primary) 40%, transparent); }
+.step-arrow { flex: none; color: var(--muted-foreground); opacity: 0.6; }
+
+/* Agent cards (marketing lifecycle showcase). */
+.agent-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(160deg, color-mix(in oklch, var(--card) 96%, var(--primary) 4%), var(--card));
+  box-shadow: var(--shadow-md);
 }
 
-.step-arrow {
-  flex: none;
-  color: var(--muted-foreground);
+/* Feature icon chip. */
+.icon-chip {
+  display: grid; place-items: center; height: 2.5rem; width: 2.5rem; flex: none;
+  border-radius: var(--radius);
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 20%, transparent);
 }
+
+/* Empty state. */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 3rem 1rem; text-align: center; color: var(--muted-foreground); }
+.empty-state .icon-chip { height: 3rem; width: 3rem; margin-bottom: 0.25rem; }
+
+/* 6. ----------------------------------------------------------------- MOTION */
+
+/* SPA-like page swaps: htmx boosted navigations get a smooth cross-fade via
+   the View Transitions API (configured in base.html). Keep it subtle. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation: vt-fade-out .18s var(--ease-out) both; }
+  ::view-transition-new(root) { animation: vt-fade-in .26s var(--ease-out) both; }
+}
+@keyframes vt-fade-out { to { opacity: 0; } }
+@keyframes vt-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Thin top progress bar shown while htmx requests are in flight. */
+#nav-progress {
+  position: fixed; top: 0; left: 0; height: 2px; width: 100%; z-index: 100;
+  transform: scaleX(0); transform-origin: 0 50%; opacity: 0;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  transition: transform .3s var(--ease-out), opacity .3s var(--ease-out);
+}
+body.htmx-request #nav-progress { opacity: 1; transform: scaleX(0.85); }
+
+/* Reveal content on first paint for a polished entrance (non-boosted loads). */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal { animation: reveal .4s var(--ease-out) both; }
+  .reveal-1 { animation-delay: .04s; }
+  .reveal-2 { animation-delay: .09s; }
+  .reveal-3 { animation-delay: .14s; }
+}
+@keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

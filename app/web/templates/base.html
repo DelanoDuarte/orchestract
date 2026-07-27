@@ -14,6 +14,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Orchestract{% endblock %}</title>
+
+<!-- htmx config: boosted navigations do a flicker-free View-Transition swap.
+     responseHandling also swaps 400/422 so form validation errors (which the
+     server re-renders as a full page with status 422) still update the view. -->
+<meta name="htmx-config" content='{"globalViewTransitions": true, "scrollBehavior": "instant", "defaultSwapStyle": "outerHTML", "responseHandling": [{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"400","swap":true},{"code":"422","swap":true},{"code":"[45]..","swap":false,"error":true}]}'>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+
 <!-- Tailwind must load (and inject its utility classes) before Basecoat's
      CSS, so Basecoat's component styles can override Tailwind's preflight
      reset rather than the other way around. -->
@@ -24,51 +34,50 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
 <link rel="stylesheet" href="/static/theme.css">
 <script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
-<style>
-  .sidebar nav ul li a{ position:relative; transition:background-color .15s ease, color .15s ease; }
-  .sidebar nav ul li a:hover{ background-color:var(--sidebar-accent); color:var(--sidebar-accent-foreground); }
-  .sidebar nav ul li a[aria-current="page"]::before{
-    content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px;
-    border-radius:0 3px 3px 0; background:var(--sidebar-primary);
-  }
-  header .btn{ transition:transform .15s ease; }
-  header .btn:hover{ transform:translateY(-1px); }
-</style>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
 </head>
-<body class="min-h-svh bg-background text-foreground">
-<div class="flex min-h-svh">
+
+<!-- hx-boost turns same-origin navigation into an AJAX swap of just <main>,
+     so the sidebar/header stay put and the page cross-fades. Auth forms that
+     change the logged-in/out chrome opt out with hx-boost="false". -->
+<body class="min-h-svh bg-background text-foreground"
+      hx-boost="true"
+      hx-target="#page-main"
+      hx-select="#page-main"
+      hx-swap="outerHTML show:window:top transition:true">
+<div id="nav-progress" aria-hidden="true"></div>
+<div class="app-shell">
   {% if organization %}
   <aside id="sidebar" class="sidebar" data-side="left">
     <nav aria-label="Sidebar navigation">
-      <header class="flex items-center gap-2 px-3 py-4">
-        <span class="text-primary">{{ icon('zap', 'size-5') }}</span>
-        <span class="font-semibold tracking-tight">Orchestract</span>
+      <header class="px-3 py-4">
+        <a href="/{{ organization.slug }}/" class="brand text-[0.95rem]">
+          <span class="brand-mark">{{ icon('zap', 'size-4') }}</span>
+          <span>Orchestract</span>
+        </a>
       </header>
-      <section class="scrollbar-sm">
-        <div role="group" aria-labelledby="group-label-nav">
-          <h3 id="group-label-nav">{{ organization.name }}</h3>
-        </div>
+      <section class="scrollbar-sm px-2">
         <div role="group" aria-labelledby="group-label-workspace">
           <h3 id="group-label-workspace">Workspace</h3>
           <ul>
             <li>
-              <a href="/{{ organization.slug }}/" {% if active_nav == "dashboard" %}aria-current="page"{% endif %}>
-                {{ icon('layout-dashboard') }}<span>Dashboard</span>
+              <a href="/{{ organization.slug }}/" data-nav="dashboard" {% if active_nav == "dashboard" %}aria-current="page"{% endif %}>
+                {{ icon('layout-dashboard', 'size-4') }}<span>Dashboard</span>
               </a>
             </li>
             <li>
-              <a href="/{{ organization.slug }}/contracts" {% if active_nav == "contracts" %}aria-current="page"{% endif %}>
-                {{ icon('file-text') }}<span>Contracts</span>
+              <a href="/{{ organization.slug }}/contracts" data-nav="contracts" {% if active_nav == "contracts" %}aria-current="page"{% endif %}>
+                {{ icon('file-text', 'size-4') }}<span>Contracts</span>
               </a>
             </li>
             <li>
-              <a href="/{{ organization.slug }}/workflows" {% if active_nav == "workflows" %}aria-current="page"{% endif %}>
-                {{ icon('git-branch') }}<span>Workflows</span>
+              <a href="/{{ organization.slug }}/workflows" data-nav="workflows" {% if active_nav == "workflows" %}aria-current="page"{% endif %}>
+                {{ icon('git-branch', 'size-4') }}<span>Workflows</span>
               </a>
             </li>
             <li>
-              <a href="/{{ organization.slug }}/agents" {% if active_nav == "agents" %}aria-current="page"{% endif %}>
-                {{ icon('users') }}<span>Agents</span>
+              <a href="/{{ organization.slug }}/agents" data-nav="agents" {% if active_nav == "agents" %}aria-current="page"{% endif %}>
+                {{ icon('users', 'size-4') }}<span>Agents</span>
               </a>
             </li>
           </ul>
@@ -77,79 +86,130 @@
           <h3 id="group-label-admin">Administration</h3>
           <ul>
             <li>
-              <a href="/{{ organization.slug }}/roles" {% if active_nav == "roles" %}aria-current="page"{% endif %}>
-                {{ icon('shield') }}<span>Roles</span>
+              <a href="/{{ organization.slug }}/roles" data-nav="roles" {% if active_nav == "roles" %}aria-current="page"{% endif %}>
+                {{ icon('shield', 'size-4') }}<span>Roles</span>
               </a>
             </li>
             <li>
-              <a href="/{{ organization.slug }}/users" {% if active_nav == "users" %}aria-current="page"{% endif %}>
-                {{ icon('user-plus') }}<span>Users</span>
+              <a href="/{{ organization.slug }}/users" data-nav="users" {% if active_nav == "users" %}aria-current="page"{% endif %}>
+                {{ icon('user-plus', 'size-4') }}<span>Users</span>
               </a>
             </li>
             <li>
-              <a href="/{{ organization.slug }}/settings/storage" {% if active_nav == "storage" %}aria-current="page"{% endif %}>
-                {{ icon('package') }}<span>Storage</span>
+              <a href="/{{ organization.slug }}/settings/storage" data-nav="storage" {% if active_nav == "storage" %}aria-current="page"{% endif %}>
+                {{ icon('package', 'size-4') }}<span>Storage</span>
               </a>
             </li>
             <li>
-              <a href="/{{ organization.slug }}/settings/billing" {% if active_nav == "billing" %}aria-current="page"{% endif %}>
-                {{ icon('credit-card') }}<span>Billing</span>
+              <a href="/{{ organization.slug }}/settings/billing" data-nav="billing" {% if active_nav == "billing" %}aria-current="page"{% endif %}>
+                {{ icon('credit-card', 'size-4') }}<span>Billing</span>
               </a>
             </li>
           </ul>
         </div>
       </section>
+      {% set me = current_user(request) %}
+      {% set my_role = current_role(request) %}
+      {% if me %}
+      <footer class="border-t border-sidebar-border p-2">
+        <a href="/{{ organization.slug }}/account"
+           class="flex items-center gap-2.5 rounded-[var(--radius-sm)] px-2 py-2 transition-colors hover:bg-[var(--sidebar-accent)]">
+          <span class="grid size-8 flex-none place-items-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+            {{ me.name[:2]|upper }}
+          </span>
+          <span class="min-w-0 flex-1 leading-tight">
+            <span class="block truncate text-sm font-medium">{{ me.name }}</span>
+            <span class="block truncate text-xs text-muted-foreground">{% if my_role %}{{ my_role.name }}{% else %}{{ me.email }}{% endif %}</span>
+          </span>
+          <span class="text-muted-foreground">{{ icon('settings', 'size-4') }}</span>
+        </a>
+      </footer>
+      {% endif %}
     </nav>
   </aside>
   {% endif %}
 
   <div class="flex min-h-svh min-w-0 flex-1 flex-col">
-    <header class="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+    <header class="app-header flex items-center justify-between gap-2 px-4 py-2.5 sm:px-6">
       {% if organization %}
-      <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="Toggle sidebar"
-              onclick="document.getElementById('sidebar')?.toggle()">
-        {{ icon('menu') }}
-      </button>
+      <div class="flex items-center gap-2">
+        <button type="button" class="btn md:hidden" data-variant="ghost" data-size="icon" aria-label="Toggle sidebar"
+                hx-boost="false" onclick="document.getElementById('sidebar')?.toggle()">
+          {{ icon('menu', 'size-4') }}
+        </button>
+        <div class="hidden items-center gap-2 text-sm md:flex">
+          <span class="grid size-6 place-items-center rounded-md bg-secondary text-secondary-foreground">
+            {{ icon('building-2', 'size-3.5') }}
+          </span>
+          <span class="font-medium">{{ organization.name }}</span>
+        </div>
+      </div>
       {% else %}
-      <a href="/" class="flex items-center gap-2 font-semibold tracking-tight">
-        <span class="text-primary">{{ icon('zap', 'size-5') }}</span>
-        Orchestract
+      <a href="/" class="brand">
+        <span class="brand-mark">{{ icon('zap', 'size-4') }}</span>
+        <span>Orchestract</span>
       </a>
       {% endif %}
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1.5">
         {% if not organization %}
         <a href="/pricing" class="btn" data-variant="ghost" data-size="sm">Pricing</a>
-        <a href="/login" class="btn" data-variant="ghost" data-size="sm">Log in</a>
-        <a href="/signup" class="btn" data-size="sm">Sign up</a>
+        <a href="/login" class="btn" data-variant="ghost" data-size="sm" hx-boost="false">Log in</a>
+        <a href="/signup" class="btn" data-size="sm" hx-boost="false">Sign up</a>
         {% endif %}
+        <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="Toggle theme"
+                hx-boost="false" onclick="window.basecoat.theme.toggle()">
+          <span class="hidden dark:block">{{ icon('sun', 'size-4') }}</span>
+          <span class="block dark:hidden">{{ icon('moon', 'size-4') }}</span>
+        </button>
         {% if organization %}
-        {% set me = current_user(request) %}
-        {% set my_role = current_role(request) %}
-        {% if me %}
-        <span class="hidden text-sm text-muted-foreground sm:inline">
-          Signed in as <span class="font-medium text-foreground">{{ me.name }}</span>{% if my_role %} · {{ my_role.name }}{% endif %}
-        </span>
-        {% endif %}
-        <a href="/{{ organization.slug }}/account" class="btn" data-variant="ghost" data-size="sm">
-          {{ icon('settings', 'size-4') }}<span>Account</span>
-        </a>
-        <form method="post" action="/logout">
+        <form method="post" action="/logout" hx-boost="false">
           <button type="submit" class="btn" data-variant="ghost" data-size="icon" aria-label="Log out">
             {{ icon('log-out', 'size-4') }}
           </button>
         </form>
         {% endif %}
-        <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="Toggle theme"
-                onclick="window.basecoat.theme.toggle()">
-          <span class="hidden dark:block">{{ icon('sun') }}</span>
-          <span class="block dark:hidden">{{ icon('moon') }}</span>
-        </button>
       </div>
     </header>
-    <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8 {{ "mx-auto w-full max-w-2xl" if (not organization and not full_width) else "" }}">
+
+    <main id="page-main"
+          class="flex-1 px-4 py-6 sm:px-6 lg:px-8 {{ 'mx-auto w-full max-w-2xl' if (not organization and not full_width) else '' }}">
       {% block content %}{% endblock %}
     </main>
+
+    {% if not organization %}
+    <footer class="border-t border-border px-4 py-8 sm:px-6">
+      <div class="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-4 text-sm text-muted-foreground sm:flex-row">
+        <a href="/" class="brand text-foreground">
+          <span class="brand-mark">{{ icon('zap', 'size-4') }}</span>
+          <span>Orchestract</span>
+        </a>
+        <p>Contract workflows, orchestrated with AI.</p>
+        <div class="flex items-center gap-4">
+          <a href="/pricing" class="hover:text-foreground">Pricing</a>
+          <a href="/login" class="hover:text-foreground" hx-boost="false">Log in</a>
+        </div>
+      </div>
+    </footer>
+    {% endif %}
   </div>
 </div>
+
+<script>
+  // Keep the sidebar's active item in sync after boosted (AJAX) navigations,
+  // since only <main> is swapped and the sidebar itself persists.
+  document.body.addEventListener("htmx:afterSettle", function () {
+    var path = window.location.pathname;
+    document.querySelectorAll(".sidebar nav a[data-nav]").forEach(function (a) {
+      var href = a.getAttribute("href");
+      // The Dashboard link ends in "/" and matches its exact path only; every
+      // other section link also matches its sub-pages (e.g. /contracts/1).
+      var match = href.endsWith("/")
+        ? path === href
+        : path === href || path.indexOf(href + "/") === 0;
+      if (match) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+  });
+</script>
 </body>
 </html>

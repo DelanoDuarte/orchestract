@@ -1,11 +1,48 @@
+{# Horizontal lifecycle pipeline (workflow builder + contract/document detail). #}
 {% macro step_pipeline(steps, current_step_key=None) %}
 <div class="step-pipeline">
+  {% set ns = namespace(passed_current=false) %}
   {% for step in steps %}
-  <div class="step-pill" data-current="{{ "true" if step.key == current_step_key else "false" }}">
+  <div class="step-pill"
+       data-current="{{ 'true' if step.key == current_step_key else 'false' }}"
+       data-done="{{ 'true' if (not ns.passed_current and step.key != current_step_key and current_step_key) else 'false' }}">
     {{ icon(step_icon(step.key), 'size-5') }}
-    <span class="text-xs font-medium uppercase tracking-wide">{{ step.name }}</span>
+    <span class="text-[0.7rem] font-medium uppercase tracking-wide">{{ step.name }}</span>
   </div>
+  {% if step.key == current_step_key %}{% set ns.passed_current = true %}{% endif %}
   {% if not loop.last %}<span class="step-arrow">{{ icon('arrow-right', 'size-4') }}</span>{% endif %}
   {% endfor %}
+</div>
+{% endmacro %}
+
+{# Standard page header: eyebrow/title/subtitle on the left, action slot on the
+   right. Use with {% call %} to pass buttons into the actions area. #}
+{% macro page_header(title, subtitle=None, eyebrow=None) %}
+<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+  <div class="min-w-0 space-y-1">
+    {% if eyebrow %}<p class="eyebrow">{{ eyebrow }}</p>{% endif %}
+    <h1 class="page-title">{{ title }}</h1>
+    {% if subtitle %}<p class="text-sm text-muted-foreground">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if caller %}<div class="flex flex-none flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{# Compact metric card for dashboards. #}
+{% macro stat_card(label, value, hint=None) %}
+<div class="card stat-card p-4">
+  <p class="eyebrow">{{ label }}</p>
+  <p class="stat-value mt-2 tabular-nums">{{ value }}</p>
+  {% if hint %}<p class="mt-1 text-xs text-muted-foreground">{{ hint }}</p>{% endif %}
+</div>
+{% endmacro %}
+
+{# Empty-state placeholder for lists/tables. #}
+{% macro empty_state(icon_name, title, message=None) %}
+<div class="empty-state">
+  <span class="icon-chip">{{ icon(icon_name, 'size-5') }}</span>
+  <p class="font-medium text-foreground">{{ title }}</p>
+  {% if message %}<p class="max-w-sm text-sm">{{ message }}</p>{% endif %}
+  {% if caller %}<div class="mt-2">{{ caller() }}</div>{% endif %}
 </div>
 {% endmacro %}

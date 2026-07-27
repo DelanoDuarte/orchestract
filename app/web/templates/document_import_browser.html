@@ -1,43 +1,42 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}Import from {{ connection.display_name }}{% endblock %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-semibold tracking-tight">Import a file from {{ connection.display_name }}</h1>
-  <p class="text-sm text-muted-foreground">
-    Picking a file copies its current contents into <strong>{{ document.name }}</strong> as a new version.
-  </p>
-</div>
-
-<div class="card" data-size="sm">
-  <div class="table-container">
-    <table class="table">
-      <thead><tr><th>Name</th><th>Type</th><th>Size</th><th></th></tr></thead>
-      <tbody>
-        {% for file in files %}
-        <tr>
-          <td class="font-medium">{{ file.name }}</td>
-          <td class="text-muted-foreground">{{ file.mime_type }}</td>
-          <td class="text-muted-foreground">{{ "%d KB"|format(file.size // 1024) if file.size else "—" }}</td>
-          <td class="text-end">
-            <form method="post" action="/{{ organization.slug }}/contracts/{{ contract_id }}/documents/{{ document.id }}/import/{{ connection.id }}"
-                  class="flex flex-wrap items-center justify-end gap-2">
-              <input type="hidden" name="external_file_id" value="{{ file.id }}">
-              <input type="text" name="notes" placeholder="Notes (optional)" class="w-40">
-              <button type="submit" class="btn" data-size="sm">Import</button>
-            </form>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="4" class="text-center text-muted-foreground">No files found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<p class="mt-4">
-  <a href="/{{ organization.slug }}/contracts/{{ contract_id }}" class="btn" data-variant="ghost">
+<div class="page reveal">
+  <a href="/{{ organization.slug }}/contracts/{{ contract_id }}" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
     {{ icon('arrow-right', 'size-4 rotate-180') }}<span>Back to contract</span>
   </a>
-</p>
+  {% call macros.page_header("Import from " ~ connection.display_name, "Picking a file copies its current contents into “" ~ document.name ~ "” as a new version.", eyebrow="Documents") %}{% endcall %}
+
+  <div class="card">
+    <div class="table-container">
+      <table class="table">
+        <thead><tr><th>Name</th><th>Type</th><th>Size</th><th></th></tr></thead>
+        <tbody>
+          {% for file in files %}
+          <tr>
+            <td class="font-medium">
+              <span class="inline-flex items-center gap-2">
+                <span class="text-muted-foreground">{{ icon('file-text', 'size-4') }}</span>{{ file.name }}
+              </span>
+            </td>
+            <td class="text-muted-foreground">{{ file.mime_type }}</td>
+            <td class="text-muted-foreground tabular-nums">{{ "%d KB"|format(file.size // 1024) if file.size else "—" }}</td>
+            <td class="text-end">
+              <form method="post" action="/{{ organization.slug }}/contracts/{{ contract_id }}/documents/{{ document.id }}/import/{{ connection.id }}"
+                    class="flex flex-wrap items-center justify-end gap-2">
+                <input type="hidden" name="external_file_id" value="{{ file.id }}">
+                <input type="text" name="notes" placeholder="Notes (optional)" class="w-40">
+                <button type="submit" class="btn" data-size="sm">{{ icon('upload', 'size-4') }}<span>Import</span></button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="p-0">{{ macros.empty_state('folder-open', 'No files found', 'This location has no files to import.') }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

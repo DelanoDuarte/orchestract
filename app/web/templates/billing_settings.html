@@ -1,75 +1,80 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}Billing{% endblock %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-semibold tracking-tight">Billing</h1>
-  <p class="text-sm text-muted-foreground">Manage your subscription plan and usage.</p>
-</div>
+<div class="page reveal">
+  {% call macros.page_header("Billing", "Manage your subscription plan and usage.", eyebrow="Settings") %}{% endcall %}
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
-{% endif %}
-{% if not billing_enabled %}
-<div class="alert mb-6" data-variant="destructive">
-  <section>Billing isn't configured yet -- an administrator needs to set the Stripe API keys.</section>
-</div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
+  {% if not billing_enabled %}
+  <div class="alert mb-6" data-variant="destructive">
+    <section>Billing isn't configured yet — an administrator needs to set the Stripe API keys.</section>
+  </div>
+  {% endif %}
 
-<div class="card mb-6" data-size="sm">
-  <header>
-    <h2>Current plan: {{ current_limits.display_name }}</h2>
-    {% if organization.subscription_status %}
-    <p>Status: {{ organization.subscription_status }}</p>
-    {% endif %}
-    {% if organization.stripe_customer_id %}
-    <div class="card-action">
+  <div class="card surface-gradient mb-6">
+    <header class="flex flex-wrap items-start justify-between gap-2 border-b border-border px-4 py-3">
+      <div>
+        <p class="eyebrow">Current plan</p>
+        <h2 class="section-title mt-1">{{ current_limits.display_name }}</h2>
+        {% if organization.subscription_status %}
+        <p class="text-sm text-muted-foreground">Status: {{ organization.subscription_status }}</p>
+        {% endif %}
+      </div>
+      {% if organization.stripe_customer_id %}
       <form method="post" action="/{{ organization.slug }}/settings/billing/portal">
         <button type="submit" class="btn" data-variant="outline" data-size="sm">Manage billing</button>
       </form>
-    </div>
-    {% endif %}
-  </header>
-  <section class="flex flex-col gap-2.5 text-[0.85rem]">
-    <div class="flex justify-between">
-      <span class="text-muted-foreground">Users</span>
-      <span class="font-semibold">{{ user_count }}{% if current_limits.max_users %} / {{ current_limits.max_users }}{% endif %}</span>
-    </div>
-    <div class="flex justify-between">
-      <span class="text-muted-foreground">Contracts</span>
-      <span class="font-semibold">{{ contract_count }}{% if current_limits.max_contracts %} / {{ current_limits.max_contracts }}{% endif %}</span>
-    </div>
-    <div class="flex justify-between">
-      <span class="text-muted-foreground">AI features</span>
-      <span class="font-semibold">{{ "Included" if current_limits.ai_enabled else "Not included" }}</span>
-    </div>
-  </section>
-</div>
-
-<div class="grid gap-6 md:grid-cols-3">
-  {% for plan, limits in plan_limits.items() %}
-  <div class="card" data-size="sm">
-    <header>
-      <h2>{{ limits.display_name }}</h2>
-      <p>${{ limits.monthly_price_usd }}/mo</p>
+      {% endif %}
     </header>
-    <section class="flex flex-col gap-3 text-sm">
-      <ul class="flex flex-col gap-1.5 text-muted-foreground">
-        <li>{{ limits.max_users or "Unlimited" }} users</li>
-        <li>{{ limits.max_contracts or "Unlimited" }} contracts</li>
-        <li>{{ "AI features included" if limits.ai_enabled else "No AI features" }}</li>
+    <section class="grid gap-4 p-4 sm:grid-cols-3">
+      <div class="rounded-[var(--radius)] border border-border bg-background/40 p-3">
+        <p class="eyebrow">Users</p>
+        <p class="mt-1 text-xl font-bold tabular-nums">{{ user_count }}{% if current_limits.max_users %}<span class="text-sm font-normal text-muted-foreground"> / {{ current_limits.max_users }}</span>{% endif %}</p>
+      </div>
+      <div class="rounded-[var(--radius)] border border-border bg-background/40 p-3">
+        <p class="eyebrow">Contracts</p>
+        <p class="mt-1 text-xl font-bold tabular-nums">{{ contract_count }}{% if current_limits.max_contracts %}<span class="text-sm font-normal text-muted-foreground"> / {{ current_limits.max_contracts }}</span>{% endif %}</p>
+      </div>
+      <div class="rounded-[var(--radius)] border border-border bg-background/40 p-3">
+        <p class="eyebrow">AI features</p>
+        <p class="mt-1 text-xl font-bold">{{ "Included" if current_limits.ai_enabled else "Not included" }}</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid gap-6 md:grid-cols-3">
+    {% for plan, limits in plan_limits.items() %}
+    {% set is_current = plan.value == current_plan.value %}
+    <div class="card flex flex-col gap-5 p-6 {{ 'border-primary/40 shadow-glow' if is_current else '' }}">
+      <div class="space-y-1">
+        <h2 class="section-title">{{ limits.display_name }}</h2>
+        <p class="flex items-baseline gap-1">
+          <span class="text-3xl font-bold tabular-nums">${{ limits.monthly_price_usd }}</span>
+          <span class="text-sm text-muted-foreground">/mo</span>
+        </p>
+      </div>
+      <ul class="flex flex-col gap-2 text-sm">
+        <li class="flex items-center gap-2"><span class="text-primary">{{ icon('check', 'size-4') }}</span>{{ limits.max_users or "Unlimited" }} users</li>
+        <li class="flex items-center gap-2"><span class="text-primary">{{ icon('check', 'size-4') }}</span>{{ limits.max_contracts or "Unlimited" }} contracts</li>
+        <li class="flex items-center gap-2 {{ '' if limits.ai_enabled else 'text-muted-foreground' }}">
+          <span class="{{ 'text-primary' if limits.ai_enabled else 'text-muted-foreground/50' }}">{{ icon('check' if limits.ai_enabled else 'circle', 'size-4') }}</span>{{ "AI features included" if limits.ai_enabled else "No AI features" }}
+        </li>
       </ul>
-      {% if plan.value == current_plan.value %}
-      <span class="badge self-start border-transparent bg-primary/15 text-primary">Current plan</span>
+      {% if is_current %}
+      <span class="badge badge-primary mt-auto self-start">Current plan</span>
       {% elif plan.value != "free" %}
-      <form method="post" action="/{{ organization.slug }}/settings/billing/checkout">
+      <form method="post" action="/{{ organization.slug }}/settings/billing/checkout" class="mt-auto">
         <input type="hidden" name="plan" value="{{ plan.value }}">
         <button type="submit" class="btn w-full" data-size="sm" {{ "disabled" if not billing_enabled }}>
           Upgrade to {{ limits.display_name }}
         </button>
       </form>
       {% endif %}
-    </section>
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
 </div>
 {% endblock %}

@@ -1,17 +1,19 @@
 {% extends "base.html" %}
 {% block title %}{{ heading }}{% endblock %}
 {% block content %}
-<div class="flex flex-col gap-6">
-  <div class="flex flex-col items-center gap-3 text-center">
-    <span class="{{ 'text-destructive' if is_error else 'text-primary' }}">
-      {{ icon('circle-x' if is_error else 'mail', 'size-8') }}
+<div class="reveal mx-auto flex w-full max-w-sm flex-col gap-6 py-6 text-center sm:py-12">
+  <div class="flex flex-col items-center gap-3">
+    <span class="{{ 'icon-chip size-11 border-destructive/25 bg-destructive/10 text-destructive' if is_error else 'icon-chip size-11' }}">
+      {{ icon('circle-x' if is_error else 'mail', 'size-5') }}
     </span>
-    <h1 class="text-2xl font-semibold tracking-tight">{{ heading }}</h1>
-    <p class="text-muted-foreground">{{ message }}</p>
+    <div class="space-y-1">
+      <h1 class="page-title">{{ heading }}</h1>
+      <p class="text-sm text-muted-foreground">{{ message }}</p>
+    </div>
   </div>
 
   {% if action_href %}
-  <a href="{{ action_href }}" class="btn w-full">{{ action_label }}</a>
+  <a href="{{ action_href }}" class="btn w-full" {% if action_href in ['/login', '/signup'] %}hx-boost="false"{% endif %}>{{ action_label }}</a>
   {% endif %}
 </div>
 {% endblock %}

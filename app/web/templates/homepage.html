@@ -1,57 +1,94 @@
 {% extends "base.html" %}
-{% block title %}Orchestract -- Contract workflows, orchestrated{% endblock %}
+{% block title %}Orchestract — Contract workflows, orchestrated{% endblock %}
 {% block content %}
-<div class="mx-auto flex max-w-5xl flex-col gap-20 py-8">
-  <section class="flex flex-col items-center gap-6 text-center">
-    <span class="badge" data-variant="secondary">Now with an AI contract assistant</span>
-    <h1 class="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-      Contract workflows, fully orchestrated -- with AI that can run them for you.
+{% set lifecycle = [
+  ('draft', 'Draft'), ('negotiate', 'Negotiate'), ('sign', 'Sign'), ('store', 'Store'),
+  ('renew', 'Renew'), ('amend', 'Amend'), ('terminate', 'Terminate'), ('archive', 'Archive')
+] %}
+<div class="mx-auto flex max-w-6xl flex-col gap-24 py-10 sm:py-16">
+
+  <!-- Hero -->
+  <section class="reveal flex flex-col items-center gap-6 text-center">
+    <span class="badge" data-variant="secondary">
+      <span class="status-dot mr-1.5"></span> Now with an AI contract assistant
+    </span>
+    <h1 class="max-w-3xl text-balance text-4xl font-[650] tracking-tight sm:text-6xl">
+      Contract workflows, fully orchestrated —
+      <span class="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">with AI that runs them for you.</span>
     </h1>
-    <p class="max-w-xl text-lg text-muted-foreground">
+    <p class="max-w-xl text-pretty text-lg text-muted-foreground">
       Define the steps a contract moves through, assign the agents and roles responsible for each,
-      and let Orchestract (and its AI assistant) keep everything moving and auditable.
+      and let Orchestract keep everything moving and auditable.
     </p>
     <div class="flex flex-wrap items-center justify-center gap-3">
-      <a href="/signup" class="btn" data-size="lg">{{ icon('zap', 'size-4') }}<span>Get started free</span></a>
-      <a href="/pricing" class="btn" data-variant="outline" data-size="lg">See pricing</a>
+      <a href="/signup" class="btn" data-size="lg" hx-boost="false">{{ icon('zap', 'size-4') }}<span>Get started free</span></a>
+      <a href="/pricing" class="btn" data-variant="outline" data-size="lg">See pricing{{ icon('arrow-right', 'size-4') }}</a>
+    </div>
+    <p class="text-xs text-muted-foreground">Free for small teams · No credit card required</p>
+  </section>
+
+  <!-- Lifecycle showcase -->
+  <section class="reveal reveal-1">
+    <div class="surface-gradient rounded-[var(--radius-xl)] p-5 shadow-lg sm:p-8">
+      <p class="eyebrow mb-4 text-center">A contract's full lifecycle — one graph</p>
+      <div class="step-pipeline justify-center">
+        {% for key, label in lifecycle %}
+        <div class="step-pill" data-current="{{ 'true' if key == 'sign' else 'false' }}" data-done="{{ 'true' if loop.index0 < 2 else 'false' }}">
+          {{ icon(step_icon(key), 'size-5') }}
+          <span class="text-[0.7rem] font-medium uppercase tracking-wide">{{ label }}</span>
+        </div>
+        {% if not loop.last %}<span class="step-arrow">{{ icon('arrow-right', 'size-4') }}</span>{% endif %}
+        {% endfor %}
+      </div>
     </div>
   </section>
 
-  <section class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-    <div class="card" data-size="sm">
-      <section class="flex flex-col gap-2">
-        <span class="text-primary">{{ icon('git-branch', 'size-6') }}</span>
-        <h3 class="font-semibold">Workflow orchestration</h3>
-        <p class="text-sm text-muted-foreground">Model each contract's lifecycle as a graph of steps, owned by the agents responsible for them.</p>
-      </section>
+  <!-- Features -->
+  <section class="flex flex-col gap-10">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="eyebrow">Everything in one place</p>
+      <h2 class="mt-2 text-3xl font-[650] tracking-tight">Built for the whole contract lifecycle</h2>
     </div>
-    <div class="card" data-size="sm">
-      <section class="flex flex-col gap-2">
-        <span class="text-primary">{{ icon('layers', 'size-6') }}</span>
-        <h3 class="font-semibold">Multi-document contracts</h3>
-        <p class="text-sm text-muted-foreground">A contract can own many documents -- exhibits, amendments, signature pages -- each with its own version history.</p>
-      </section>
-    </div>
-    <div class="card" data-size="sm">
-      <section class="flex flex-col gap-2">
-        <span class="text-primary">{{ icon('zap', 'size-6') }}</span>
-        <h3 class="font-semibold">AI summaries & assistant</h3>
-        <p class="text-sm text-muted-foreground">Summarize any document or contract on demand, or ask the AI assistant to drive a contract through its workflow for you.</p>
-      </section>
-    </div>
-    <div class="card" data-size="sm">
-      <section class="flex flex-col gap-2">
-        <span class="text-primary">{{ icon('shield', 'size-6') }}</span>
-        <h3 class="font-semibold">Role-based permissions</h3>
-        <p class="text-sm text-muted-foreground">Link roles to the agents that own each step -- only the right people (or an AI acting on their behalf) can act on it.</p>
-      </section>
+    <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {% set features = [
+        ('git-branch', 'Workflow orchestration', "Model each contract's lifecycle as a graph of steps, owned by the agents responsible for them."),
+        ('layers', 'Multi-document contracts', 'A contract owns many documents — exhibits, amendments, signature pages — each with its own version history.'),
+        ('zap', 'AI summaries & assistant', 'Summarize any document on demand, or ask the AI assistant to drive a contract through its workflow.'),
+        ('shield', 'Role-based permissions', 'Link roles to the agents that own each step — only the right people (or AI on their behalf) can act.')
+      ] %}
+      {% for ic, title, body in features %}
+      <div class="card card-hover flex flex-col gap-3 p-5">
+        <span class="icon-chip">{{ icon(ic, 'size-5') }}</span>
+        <h3 class="section-title">{{ title }}</h3>
+        <p class="text-sm text-muted-foreground">{{ body }}</p>
+      </div>
+      {% endfor %}
     </div>
   </section>
 
-  <section class="flex flex-col items-center gap-4 rounded-lg border border-border py-12 text-center">
-    <h2 class="text-2xl font-semibold tracking-tight">Ready to orchestrate your contracts?</h2>
+  <!-- How it works -->
+  <section class="grid gap-6 lg:grid-cols-3">
+    {% set steps = [
+      ('1', 'Design the workflow', 'Lay out the steps a contract moves through and assign an owning agent to each.'),
+      ('2', 'Invite your team', 'Create roles, link them to agents, and invite the people who act on each step.'),
+      ('3', 'Let it run', 'Move contracts along manually, or let the AI assistant drive them end to end.')
+    ] %}
+    {% for num, title, body in steps %}
+    <div class="flex gap-4">
+      <span class="grid size-9 flex-none place-items-center rounded-full border border-primary/30 bg-primary/10 text-sm font-semibold text-primary tabular-nums">{{ num }}</span>
+      <div class="space-y-1">
+        <h3 class="section-title">{{ title }}</h3>
+        <p class="text-sm text-muted-foreground">{{ body }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <!-- Final CTA -->
+  <section class="surface-gradient flex flex-col items-center gap-4 rounded-[var(--radius-xl)] px-6 py-14 text-center shadow-lg">
+    <h2 class="text-3xl font-[650] tracking-tight">Ready to orchestrate your contracts?</h2>
     <p class="max-w-md text-muted-foreground">Free for small teams. No credit card required to start.</p>
-    <a href="/signup" class="btn" data-size="lg">Create your organization</a>
+    <a href="/signup" class="btn" data-size="lg" hx-boost="false">{{ icon('zap', 'size-4') }}<span>Create your organization</span></a>
   </section>
 </div>
 {% endblock %}

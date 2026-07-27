@@ -1,56 +1,58 @@
 {% extends "base.html" %}
 {% block title %}{{ workflow.name }}{% endblock %}
 {% block content %}
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <div>
-    <h1 class="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-      {{ workflow.name }}
-      {% if workflow.status.value == "active" %}
-      <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
-      {% elif workflow.status.value == "draft" %}
-      <span class="badge" data-variant="secondary">Draft</span>
-      {% else %}
-      <span class="badge" data-variant="outline">Retired</span>
-      {% endif %}
-    </h1>
-    <p class="text-sm text-muted-foreground">{{ workflow.description or "" }}</p>
+<div class="page reveal">
+  <a href="/{{ organization.slug }}/workflows" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    {{ icon('arrow-right', 'size-4 rotate-180') }}<span>All workflows</span>
+  </a>
+
+  <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+    <div class="space-y-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <h1 class="page-title">{{ workflow.name }}</h1>
+        {% if workflow.status.value == "active" %}
+        <span class="badge badge-success"><span class="status-dot mr-1"></span>Active</span>
+        {% elif workflow.status.value == "draft" %}
+        <span class="badge badge-muted">Draft</span>
+        {% else %}
+        <span class="badge" data-variant="outline">Retired</span>
+        {% endif %}
+      </div>
+      {% if workflow.description %}<p class="text-sm text-muted-foreground">{{ workflow.description }}</p>{% endif %}
+    </div>
   </div>
-</div>
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive">
-  <section>{{ error }}</section>
-</div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
 
-{% if workflow.status.value == "draft" %}
-<div class="alert mb-6">
-  {{ icon('zap', 'size-4') }}
-  <h2>How a workflow works</h2>
-  <section>
-    <p>
-      A workflow is a graph of <strong>steps</strong>, each owned by an <strong>agent</strong>. One
-      step is the <strong>start</strong> (where new documents begin) and at least one is an
-      <strong>end</strong> (where the workflow completes). <strong>Transitions</strong> are named
-      actions — like <code>approve</code> or <code>request_changes</code> — that move a document
-      from one step to another. Add as many as you like, including loops back to earlier steps.
-    </p>
-  </section>
-</div>
-{% endif %}
+  {% if workflow.status.value == "draft" %}
+  <div class="alert mb-6">
+    {{ icon('zap', 'size-4') }}
+    <h2>How a workflow works</h2>
+    <section>
+      <p>
+        A workflow is a graph of <strong>steps</strong>, each owned by an <strong>agent</strong>. One
+        step is the <strong>start</strong> (where new documents begin) and at least one is an
+        <strong>end</strong> (where the workflow completes). <strong>Transitions</strong> are named
+        actions — like <code>approve</code> or <code>request_changes</code> — that move a document
+        from one step to another. Add as many as you like, including loops back to earlier steps.
+      </p>
+    </section>
+  </div>
+  {% endif %}
 
-<div class="card mb-6" data-size="sm">
-  <header><h2 class="text-sm font-medium text-muted-foreground">Lifecycle graph</h2></header>
-  <section>
+  <div class="card mb-6 p-4">
+    <p class="eyebrow mb-3">Lifecycle graph</p>
     {% if workflow.steps %}
     <div class="step-pipeline">
       {% for step in workflow.steps %}
       <div class="step-pill" title="{{ step.description or "" }}">
-        <span class="text-muted-foreground">{{ icon(step_icon(step.key), 'size-5') }}</span>
-        <span class="text-xs font-medium uppercase tracking-wide">{{ step.name }}</span>
+        {{ icon(step_icon(step.key), 'size-5') }}
+        <span class="text-[0.7rem] font-medium uppercase tracking-wide">{{ step.name }}</span>
         <span class="text-[0.65rem] text-muted-foreground">{{ agent_names.get(step.agent_id, "agent #" ~ step.agent_id) }}</span>
         {% if step.is_initial or step.is_terminal %}
-        <span class="badge" data-variant="{{ "secondary" if step.is_initial else "outline" }}">
+        <span class="badge {{ 'badge-primary' if step.is_initial else '' }}" {% if step.is_terminal %}data-variant="outline"{% endif %}>
           {{ "Start" if step.is_initial else "End" }}
         </span>
         {% endif %}
@@ -61,202 +63,202 @@
     {% else %}
     <p class="text-sm text-muted-foreground">Add your first step below to see the graph here.</p>
     {% endif %}
-  </section>
-</div>
-
-<div class="flex flex-col gap-6">
-  <div class="card" data-size="sm">
-    <header>
-      <h2 class="flex items-center gap-2">
-        <span class="badge border-transparent bg-primary/15 text-primary">1</span>
-        Steps
-      </h2>
-      <p>Who's involved, and what happens at each stage of the process.</p>
-    </header>
-    <section class="flex flex-col gap-6">
-      <div class="table-container">
-        <table class="table">
-          <thead><tr><th>Step</th><th>What happens</th><th>Agent</th><th></th></tr></thead>
-          <tbody>
-            {% for step in workflow.steps %}
-            <tr>
-              <td class="font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {{ icon(step_icon(step.key), 'size-4 text-muted-foreground') }}
-                  {{ step.name }}
-                </span>
-              </td>
-              <td class="text-muted-foreground">{{ step.description or "—" }}</td>
-              <td>{{ agent_names.get(step.agent_id, "agent #" ~ step.agent_id) }}</td>
-              <td class="text-end">
-                {% if step.is_initial %}<span class="badge" data-variant="secondary">Start</span>{% endif %}
-                {% if step.is_terminal %}<span class="badge" data-variant="outline">End</span>{% endif %}
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" class="text-center text-muted-foreground">No steps yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      {% if workflow.status.value == "draft" %}
-      <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/steps"
-            class="flex flex-col gap-4 border-t border-border pt-6">
-        <h3 class="text-sm font-medium">Add a step</h3>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div role="group" class="field">
-            <label for="step-name">Name</label>
-            <input id="step-name" type="text" name="name" required placeholder="e.g. Draft">
-          </div>
-          <div role="group" class="field">
-            <label for="step-key">Key</label>
-            <input id="step-key" type="text" name="key" required placeholder="e.g. draft">
-            <p>A short, unique id used internally to wire up transitions.</p>
-          </div>
-        </div>
-        <div role="group" class="field">
-          <label for="step-description">What happens here?</label>
-          <input id="step-description" type="text" name="description" placeholder="e.g. Legal drafts the initial contract text.">
-        </div>
-        <div role="group" class="field">
-          <label for="step-agent">Owned by</label>
-          <select id="step-agent" name="agent_id" class="select w-full" required>
-            {% for agent in agents %}<option value="{{ agent.id }}">{{ agent.name }}</option>{% endfor %}
-          </select>
-          <p>The agent responsible for acting while a document is on this step.</p>
-        </div>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <div class="rounded-lg border border-border p-3">
-            <div role="group" class="field" data-orientation="horizontal">
-              <input id="step-initial" type="checkbox" name="is_initial">
-              <label for="step-initial">This is the start step</label>
-            </div>
-            <p class="mt-1 text-xs text-muted-foreground">New documents begin here. Only one step can be the start.</p>
-          </div>
-          <div class="rounded-lg border border-border p-3">
-            <div role="group" class="field" data-orientation="horizontal">
-              <input id="step-terminal" type="checkbox" name="is_terminal">
-              <label for="step-terminal">This is an end step</label>
-            </div>
-            <p class="mt-1 text-xs text-muted-foreground">The workflow completes when a document reaches here.</p>
-          </div>
-        </div>
-        <button type="submit" class="btn self-start">{{ icon('plus', 'size-4') }}<span>Add step</span></button>
-      </form>
-      {% else %}
-      <p class="text-xs text-muted-foreground">
-        {{ icon('ban', 'size-3.5 inline') }} This workflow is live — steps are locked.
-      </p>
-      {% endif %}
-    </section>
   </div>
 
-  <div class="card" data-size="sm">
-    <header>
-      <h2 class="flex items-center gap-2">
-        <span class="badge border-transparent bg-primary/15 text-primary">2</span>
-        Transitions
-      </h2>
-      <p>How a document moves from one step to another.</p>
-    </header>
-    <section class="flex flex-col gap-6">
-      <div class="table-container">
-        <table class="table">
-          <thead><tr><th>From</th><th></th><th>When this happens</th><th></th><th>Goes to</th></tr></thead>
-          <tbody>
-            {% for t in workflow.transitions %}
-            <tr>
-              <td><code class="text-xs">{{ t.from_step_key }}</code></td>
-              <td class="text-muted-foreground">{{ icon('arrow-right', 'size-4') }}</td>
-              <td>{{ t.action_name }}{% if t.description %}<span class="block text-xs text-muted-foreground">{{ t.description }}</span>{% endif %}</td>
-              <td class="text-muted-foreground">{{ icon('arrow-right', 'size-4') }}</td>
-              <td><code class="text-xs">{{ t.to_step_key }}</code></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" class="text-center text-muted-foreground">No transitions yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+  <div class="flex flex-col gap-6">
+    <div class="card">
+      <header class="border-b border-border px-4 py-3">
+        <h2 class="section-title inline-flex items-center gap-2">
+          <span class="grid size-6 place-items-center rounded-full bg-primary/15 text-xs font-semibold text-primary">1</span>
+          Steps
+        </h2>
+        <p class="text-sm text-muted-foreground">Who's involved, and what happens at each stage of the process.</p>
+      </header>
+      <section class="flex flex-col gap-6 p-4">
+        <div class="table-container rounded-[var(--radius)] border border-border">
+          <table class="table">
+            <thead><tr><th>Step</th><th>What happens</th><th>Agent</th><th></th></tr></thead>
+            <tbody>
+              {% for step in workflow.steps %}
+              <tr>
+                <td class="font-medium">
+                  <span class="inline-flex items-center gap-1.5">
+                    {{ icon(step_icon(step.key), 'size-4 text-muted-foreground') }}
+                    {{ step.name }}
+                  </span>
+                </td>
+                <td class="text-muted-foreground">{{ step.description or "—" }}</td>
+                <td class="text-muted-foreground">{{ agent_names.get(step.agent_id, "agent #" ~ step.agent_id) }}</td>
+                <td class="text-end">
+                  {% if step.is_initial %}<span class="badge badge-primary">Start</span>{% endif %}
+                  {% if step.is_terminal %}<span class="badge" data-variant="outline">End</span>{% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="text-center text-muted-foreground">No steps yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
 
-      {% if workflow.status.value == "draft" %}
-        {% if workflow.steps|length >= 2 %}
-        <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/transitions"
+        {% if workflow.status.value == "draft" %}
+        <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/steps"
               class="flex flex-col gap-4 border-t border-border pt-6">
-          <h3 class="text-sm font-medium">Add a transition</h3>
+          <h3 class="section-title">Add a step</h3>
           <div class="grid gap-4 sm:grid-cols-2">
             <div role="group" class="field">
-              <label for="transition-from">From step</label>
-              <select id="transition-from" name="from_key" class="select w-full" required>
-                {% for step in workflow.steps %}<option value="{{ step.key }}">{{ step.name }}</option>{% endfor %}
-              </select>
+              <label for="step-name">Name</label>
+              <input id="step-name" type="text" name="name" required placeholder="e.g. Draft">
             </div>
             <div role="group" class="field">
-              <label for="transition-to">Goes to</label>
-              <select id="transition-to" name="to_key" class="select w-full" required>
-                {% for step in workflow.steps %}<option value="{{ step.key }}">{{ step.name }}</option>{% endfor %}
-              </select>
+              <label for="step-key">Key</label>
+              <input id="step-key" type="text" name="key" required placeholder="e.g. draft">
+              <p>A short, unique id used internally to wire up transitions.</p>
             </div>
           </div>
           <div role="group" class="field">
-            <label for="transition-action">Action name</label>
-            <input id="transition-action" type="text" name="action_name" required placeholder="e.g. approve">
-            <p>Shown to users as the button that triggers this move.</p>
+            <label for="step-description">What happens here?</label>
+            <input id="step-description" type="text" name="description" placeholder="e.g. Legal drafts the initial contract text.">
           </div>
           <div role="group" class="field">
-            <label for="transition-description">Description (optional)</label>
-            <input id="transition-description" type="text" name="description" placeholder="e.g. Legal signs off on the terms.">
+            <label for="step-agent">Owned by</label>
+            <select id="step-agent" name="agent_id" class="select w-full" required>
+              {% for agent in agents %}<option value="{{ agent.id }}">{{ agent.name }}</option>{% endfor %}
+            </select>
+            <p>The agent responsible for acting while a document is on this step.</p>
           </div>
-          <button type="submit" class="btn self-start">{{ icon('plus', 'size-4') }}<span>Add transition</span></button>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="rounded-[var(--radius)] border border-border p-3">
+              <div role="group" class="field" data-orientation="horizontal">
+                <input id="step-initial" type="checkbox" name="is_initial">
+                <label for="step-initial">This is the start step</label>
+              </div>
+              <p class="mt-1 text-xs text-muted-foreground">New documents begin here. Only one step can be the start.</p>
+            </div>
+            <div class="rounded-[var(--radius)] border border-border p-3">
+              <div role="group" class="field" data-orientation="horizontal">
+                <input id="step-terminal" type="checkbox" name="is_terminal">
+                <label for="step-terminal">This is an end step</label>
+              </div>
+              <p class="mt-1 text-xs text-muted-foreground">The workflow completes when a document reaches here.</p>
+            </div>
+          </div>
+          <button type="submit" class="btn self-start">{{ icon('plus', 'size-4') }}<span>Add step</span></button>
         </form>
         {% else %}
-        <p class="text-sm text-muted-foreground border-t border-border pt-6">
-          Add at least two steps above before wiring transitions between them.
+        <p class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          {{ icon('ban', 'size-3.5') }} This workflow is live — steps are locked.
         </p>
         {% endif %}
-      {% else %}
-      <p class="text-xs text-muted-foreground">
-        {{ icon('ban', 'size-3.5 inline') }} This workflow is live — transitions are locked.
-      </p>
-      {% endif %}
-    </section>
-  </div>
+      </section>
+    </div>
 
-  {% if workflow.status.value == "draft" %}
-  <div class="card" data-size="sm">
-    <header>
-      <h2 class="flex items-center gap-2">
-        <span class="badge border-transparent bg-primary/15 text-primary">3</span>
-        Activate
-      </h2>
-      <p>Locks the graph so documents can start running through it.</p>
-    </header>
-    <section class="flex flex-col gap-4">
-      {% if issues %}
-      <div class="alert" data-variant="destructive">
-        {{ icon('circle-x', 'size-4') }}
-        <h2>Not ready yet</h2>
-        <section>
-          <ul>
-            {% for issue in issues %}<li>{{ issue }}</li>{% endfor %}
-          </ul>
-        </section>
-      </div>
-      {% else %}
-      <div class="alert">
-        {{ icon('check', 'size-4') }}
-        <h2>Ready to activate</h2>
-        <section>Every step is reachable from the start, and an end step is defined.</section>
-      </div>
-      {% endif %}
-      <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/activate">
-        <button type="submit" class="btn" {{ "disabled" if issues else "" }}>
-          {{ icon('check', 'size-4') }}<span>Activate workflow</span>
-        </button>
-      </form>
-    </section>
+    <div class="card">
+      <header class="border-b border-border px-4 py-3">
+        <h2 class="section-title inline-flex items-center gap-2">
+          <span class="grid size-6 place-items-center rounded-full bg-primary/15 text-xs font-semibold text-primary">2</span>
+          Transitions
+        </h2>
+        <p class="text-sm text-muted-foreground">How a document moves from one step to another.</p>
+      </header>
+      <section class="flex flex-col gap-6 p-4">
+        <div class="table-container rounded-[var(--radius)] border border-border">
+          <table class="table">
+            <thead><tr><th>From</th><th></th><th>When this happens</th><th></th><th>Goes to</th></tr></thead>
+            <tbody>
+              {% for t in workflow.transitions %}
+              <tr>
+                <td><code class="rounded bg-muted px-1.5 py-0.5 text-xs">{{ t.from_step_key }}</code></td>
+                <td class="text-muted-foreground">{{ icon('arrow-right', 'size-4') }}</td>
+                <td>{{ t.action_name }}{% if t.description %}<span class="block text-xs text-muted-foreground">{{ t.description }}</span>{% endif %}</td>
+                <td class="text-muted-foreground">{{ icon('arrow-right', 'size-4') }}</td>
+                <td><code class="rounded bg-muted px-1.5 py-0.5 text-xs">{{ t.to_step_key }}</code></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center text-muted-foreground">No transitions yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if workflow.status.value == "draft" %}
+          {% if workflow.steps|length >= 2 %}
+          <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/transitions"
+                class="flex flex-col gap-4 border-t border-border pt-6">
+            <h3 class="section-title">Add a transition</h3>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div role="group" class="field">
+                <label for="transition-from">From step</label>
+                <select id="transition-from" name="from_key" class="select w-full" required>
+                  {% for step in workflow.steps %}<option value="{{ step.key }}">{{ step.name }}</option>{% endfor %}
+                </select>
+              </div>
+              <div role="group" class="field">
+                <label for="transition-to">Goes to</label>
+                <select id="transition-to" name="to_key" class="select w-full" required>
+                  {% for step in workflow.steps %}<option value="{{ step.key }}">{{ step.name }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+            <div role="group" class="field">
+              <label for="transition-action">Action name</label>
+              <input id="transition-action" type="text" name="action_name" required placeholder="e.g. approve">
+              <p>Shown to users as the button that triggers this move.</p>
+            </div>
+            <div role="group" class="field">
+              <label for="transition-description">Description (optional)</label>
+              <input id="transition-description" type="text" name="description" placeholder="e.g. Legal signs off on the terms.">
+            </div>
+            <button type="submit" class="btn self-start">{{ icon('plus', 'size-4') }}<span>Add transition</span></button>
+          </form>
+          {% else %}
+          <p class="border-t border-border pt-6 text-sm text-muted-foreground">
+            Add at least two steps above before wiring transitions between them.
+          </p>
+          {% endif %}
+        {% else %}
+        <p class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          {{ icon('ban', 'size-3.5') }} This workflow is live — transitions are locked.
+        </p>
+        {% endif %}
+      </section>
+    </div>
+
+    {% if workflow.status.value == "draft" %}
+    <div class="card">
+      <header class="border-b border-border px-4 py-3">
+        <h2 class="section-title inline-flex items-center gap-2">
+          <span class="grid size-6 place-items-center rounded-full bg-primary/15 text-xs font-semibold text-primary">3</span>
+          Activate
+        </h2>
+        <p class="text-sm text-muted-foreground">Locks the graph so documents can start running through it.</p>
+      </header>
+      <section class="flex flex-col gap-4 p-4">
+        {% if issues %}
+        <div class="alert" data-variant="destructive">
+          {{ icon('circle-x', 'size-4') }}
+          <h2>Not ready yet</h2>
+          <section>
+            <ul>
+              {% for issue in issues %}<li>{{ issue }}</li>{% endfor %}
+            </ul>
+          </section>
+        </div>
+        {% else %}
+        <div class="alert">
+          {{ icon('check', 'size-4') }}
+          <h2>Ready to activate</h2>
+          <section>Every step is reachable from the start, and an end step is defined.</section>
+        </div>
+        {% endif %}
+        <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/activate">
+          <button type="submit" class="btn" {{ "disabled" if issues else "" }}>
+            {{ icon('check', 'size-4') }}<span>Activate workflow</span>
+          </button>
+        </form>
+      </section>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 {% endblock %}

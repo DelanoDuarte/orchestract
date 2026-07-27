@@ -1,25 +1,31 @@
 {% extends "base.html" %}
 {% block title %}New role{% endblock %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-semibold tracking-tight">New role</h1>
-  <p class="text-sm text-muted-foreground">e.g. Legal Lead, Finance Approver, Signatory.</p>
-</div>
+<div class="page-narrow reveal">
+  <a href="/{{ organization.slug }}/roles" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    {{ icon('arrow-right', 'size-4 rotate-180') }}<span>All roles</span>
+  </a>
+  <div class="mb-6 flex items-start gap-3">
+    <span class="icon-chip">{{ icon('shield', 'size-5') }}</span>
+    <div class="space-y-1">
+      <h1 class="page-title">New role</h1>
+      <p class="text-sm text-muted-foreground">e.g. Legal Lead, Finance Approver, Signatory.</p>
+    </div>
+  </div>
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
 
-<div class="card mx-auto max-w-lg" data-size="sm">
-  <section>
+  <div class="card p-6">
     <form method="post" action="/{{ organization.slug }}/roles" class="flex flex-col gap-4">
       <div role="group" class="field">
         <label for="role-name">Name</label>
-        <input id="role-name" type="text" name="name" required>
+        <input id="role-name" type="text" name="name" required placeholder="e.g. Legal Lead">
       </div>
       <div role="group" class="field">
         <label for="role-description">Description</label>
-        <input id="role-description" type="text" name="description">
+        <input id="role-description" type="text" name="description" placeholder="Optional">
       </div>
       <div role="group" class="field">
         <label for="role-agent">Linked agent</label>
@@ -31,6 +37,6 @@
       </div>
       <button type="submit" class="btn w-full">Create role</button>
     </form>
-  </section>
+  </div>
 </div>
 {% endblock %}

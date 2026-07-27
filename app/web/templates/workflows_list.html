@@ -1,53 +1,47 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}Workflows{% endblock %}
 {% block content %}
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <div>
-    <h1 class="text-2xl font-semibold tracking-tight">Workflow definitions</h1>
-    <p class="text-sm text-muted-foreground">
-      Design the graph documents move through: steps owned by agents, wired together by transitions.
-    </p>
-  </div>
-  <a href="/{{ organization.slug }}/workflows/new" class="btn">
-    {{ icon('plus', 'size-4') }}<span>New workflow</span>
-  </a>
-</div>
+<div class="page reveal">
+  {% call macros.page_header("Workflow definitions", "Design the graph documents move through: steps owned by agents, wired together by transitions.", eyebrow="Workspace") %}
+    <a href="/{{ organization.slug }}/workflows/new" class="btn">
+      {{ icon('plus', 'size-4') }}<span>New workflow</span>
+    </a>
+  {% endcall %}
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive">
-  <section>{{ error }}</section>
-</div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
 
-<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-  {% for wf in workflows %}
-  <a href="/{{ organization.slug }}/workflows/{{ wf.id }}" class="card transition-colors hover:border-accent" data-size="sm">
-    <header>
-      <h2 class="flex items-center gap-2">
-        <span class="text-accent">{{ icon('zap', 'size-4') }}</span>
-        {{ wf.name }}
-      </h2>
-      <div class="card-action">
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for wf in workflows %}
+    <a href="/{{ organization.slug }}/workflows/{{ wf.id }}" class="card card-hover flex flex-col gap-3 p-5">
+      <div class="flex items-start justify-between gap-2">
+        <span class="icon-chip">{{ icon('git-branch', 'size-5') }}</span>
         {% if wf.status.value == "active" %}
-        <span class="badge border-transparent bg-primary/15 text-primary">Active</span>
+        <span class="badge badge-success">Active</span>
         {% elif wf.status.value == "draft" %}
-        <span class="badge" data-variant="secondary">Draft</span>
+        <span class="badge badge-muted">Draft</span>
         {% else %}
         <span class="badge" data-variant="outline">Retired</span>
         {% endif %}
       </div>
-    </header>
-    <section>
-      <p class="text-sm text-muted-foreground">{{ wf.description or "No description yet." }}</p>
-    </section>
-    <footer>
-      <span class="text-xs text-muted-foreground">{{ wf.steps|length }} steps · {{ wf.transitions|length }} transitions</span>
-    </footer>
-  </a>
-  {% else %}
-  <div class="card sm:col-span-2 lg:col-span-3" data-size="sm">
-    <section class="text-center text-muted-foreground">No workflow definitions yet.</section>
+      <div class="space-y-1">
+        <h2 class="section-title">{{ wf.name }}</h2>
+        <p class="line-clamp-2 text-sm text-muted-foreground">{{ wf.description or "No description yet." }}</p>
+      </div>
+      <div class="mt-auto flex items-center gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
+        <span class="inline-flex items-center gap-1">{{ icon('layers', 'size-3.5') }}{{ wf.steps|length }} steps</span>
+        <span class="inline-flex items-center gap-1">{{ icon('arrow-right', 'size-3.5') }}{{ wf.transitions|length }} transitions</span>
+      </div>
+    </a>
+    {% else %}
+    <div class="card sm:col-span-2 lg:col-span-3">
+      {% call macros.empty_state('git-branch', 'No workflow definitions yet', 'Create a workflow to define the lifecycle your contracts follow.') %}
+        <a href="/{{ organization.slug }}/workflows/new" class="btn" data-size="sm">{{ icon('plus', 'size-4') }}<span>New workflow</span></a>
+      {% endcall %}
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
 </div>
 {% endblock %}

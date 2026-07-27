@@ -1,49 +1,50 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}Roles{% endblock %}
 {% block content %}
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <div>
-    <h1 class="text-2xl font-semibold tracking-tight">Roles</h1>
-    <p class="text-sm text-muted-foreground">
-      Dynamically created roles for your users. Link a role to an agent to restrict who can act on
-      that agent's workflow steps — steps owned by an agent with no linked role stay open to anyone.
-    </p>
-  </div>
-  <a href="/{{ organization.slug }}/roles/new" class="btn">
-    {{ icon('plus', 'size-4') }}<span>New role</span>
-  </a>
-</div>
+<div class="page reveal">
+  {% call macros.page_header("Roles", "Link a role to an agent to restrict who can act on that agent's workflow steps — steps owned by an agent with no linked role stay open to anyone.", eyebrow="Administration") %}
+    <a href="/{{ organization.slug }}/roles/new" class="btn">{{ icon('plus', 'size-4') }}<span>New role</span></a>
+  {% endcall %}
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive">
-  <section>{{ error }}</section>
-</div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
 
-<div class="card" data-size="sm">
-  <div class="table-container">
-    <table class="table">
-      <thead>
-        <tr><th>Name</th><th>Description</th><th>Linked agent</th></tr>
-      </thead>
-      <tbody>
-        {% for role in roles %}
-        <tr>
-          <td class="font-medium">{{ role.name }}</td>
-          <td class="text-muted-foreground">{{ role.description or "" }}</td>
-          <td>
-            {% if role.agent_id %}
-            <span class="badge border-transparent bg-primary/15 text-primary">{{ agent_names.get(role.agent_id, "agent #" ~ role.agent_id) }}</span>
-            {% else %}
-            <span class="badge" data-variant="outline">Open to anyone</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="3" class="text-center text-muted-foreground">No roles yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="card">
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr><th>Name</th><th>Description</th><th>Linked agent</th></tr>
+        </thead>
+        <tbody>
+          {% for role in roles %}
+          <tr>
+            <td class="font-medium">
+              <span class="inline-flex items-center gap-2">
+                <span class="grid size-7 flex-none place-items-center rounded-md bg-secondary text-secondary-foreground">{{ icon('shield', 'size-3.5') }}</span>
+                {{ role.name }}
+              </span>
+            </td>
+            <td class="text-muted-foreground">{{ role.description or "—" }}</td>
+            <td>
+              {% if role.agent_id %}
+              <span class="badge badge-primary">{{ agent_names.get(role.agent_id, "agent #" ~ role.agent_id) }}</span>
+              {% else %}
+              <span class="badge" data-variant="outline">Open to anyone</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="p-0">
+            {% call macros.empty_state('shield', 'No roles yet', 'Create roles to control who can act on each workflow step.') %}
+              <a href="/{{ organization.slug }}/roles/new" class="btn" data-size="sm">{{ icon('plus', 'size-4') }}<span>New role</span></a>
+            {% endcall %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 {% endblock %}

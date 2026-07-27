@@ -1,28 +1,34 @@
 {% extends "base.html" %}
 {% block title %}New workflow{% endblock %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-semibold tracking-tight">New workflow</h1>
-  <p class="text-sm text-muted-foreground">Starts in draft — add steps and transitions, then activate it.</p>
-</div>
+<div class="page-narrow reveal">
+  <a href="/{{ organization.slug }}/workflows" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    {{ icon('arrow-right', 'size-4 rotate-180') }}<span>All workflows</span>
+  </a>
+  <div class="mb-6 flex items-start gap-3">
+    <span class="icon-chip">{{ icon('git-branch', 'size-5') }}</span>
+    <div class="space-y-1">
+      <h1 class="page-title">New workflow</h1>
+      <p class="text-sm text-muted-foreground">Starts in draft — add steps and transitions, then activate it.</p>
+    </div>
+  </div>
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
 
-<div class="card mx-auto max-w-lg" data-size="sm">
-  <section>
+  <div class="card p-6">
     <form method="post" action="/{{ organization.slug }}/workflows" class="flex flex-col gap-4">
       <div role="group" class="field">
         <label for="workflow-name">Name</label>
-        <input id="workflow-name" type="text" name="name" required>
+        <input id="workflow-name" type="text" name="name" required placeholder="e.g. Standard Contract Lifecycle">
       </div>
       <div role="group" class="field">
         <label for="workflow-description">Description</label>
-        <input id="workflow-description" type="text" name="description">
+        <input id="workflow-description" type="text" name="description" placeholder="Optional">
       </div>
       <button type="submit" class="btn w-full">Create</button>
     </form>
-  </section>
+  </div>
 </div>
 {% endblock %}

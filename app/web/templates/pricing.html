@@ -1,33 +1,53 @@
 {% extends "base.html" %}
 {% block title %}Pricing{% endblock %}
 {% block content %}
-<div class="mx-auto flex max-w-5xl flex-col gap-10 py-8">
-  <div class="flex flex-col items-center gap-3 text-center">
-    <h1 class="text-4xl font-semibold tracking-tight">Simple, transparent pricing</h1>
-    <p class="max-w-lg text-muted-foreground">Start free. Upgrade when your team and contract volume grow.</p>
+<div class="mx-auto flex max-w-5xl flex-col gap-12 py-10 sm:py-16">
+  <div class="reveal flex flex-col items-center gap-3 text-center">
+    <span class="badge" data-variant="secondary">Pricing</span>
+    <h1 class="text-4xl font-[650] tracking-tight sm:text-5xl">Simple, transparent pricing</h1>
+    <p class="max-w-lg text-lg text-muted-foreground">Start free. Upgrade when your team and contract volume grow.</p>
   </div>
 
-  <div class="grid gap-6 md:grid-cols-3">
+  <div class="grid items-start gap-6 md:grid-cols-3">
     {% for plan, limits in plan_limits.items() %}
-    <div class="card" data-size="sm">
-      <header>
-        <h2 class="text-lg">{{ limits.display_name }}</h2>
-        <p class="text-2xl font-semibold text-foreground">
-          ${{ limits.monthly_price_usd }}<span class="text-sm font-normal text-muted-foreground">/mo</span>
+    {% set popular = loop.index == 2 %}
+    <div class="card {{ 'card-hover' if not popular }} relative flex flex-col gap-5 p-6 {{ 'shadow-glow border-primary/40' if popular else '' }}">
+      {% if popular %}
+      <span class="badge badge-primary absolute -top-3 left-1/2 -translate-x-1/2">Most popular</span>
+      {% endif %}
+      <div class="space-y-1">
+        <h2 class="section-title">{{ limits.display_name }}</h2>
+        <p class="flex items-baseline gap-1">
+          <span class="text-4xl font-[700] tracking-tight tabular-nums">${{ limits.monthly_price_usd }}</span>
+          <span class="text-sm text-muted-foreground">/month</span>
         </p>
-      </header>
-      <section class="flex flex-col gap-4">
-        <ul class="flex flex-col gap-2 text-sm text-muted-foreground">
-          <li class="flex items-center gap-2">{{ icon('check', 'size-4 text-primary') }}{{ limits.max_users or "Unlimited" }} users</li>
-          <li class="flex items-center gap-2">{{ icon('check', 'size-4 text-primary') }}{{ limits.max_contracts or "Unlimited" }} contracts</li>
-          <li class="flex items-center gap-2">{{ icon('check', 'size-4 text-primary') }}{{ "AI summaries & assistant" if limits.ai_enabled else "No AI features" }}</li>
-        </ul>
-        <a href="/signup{{ '?plan=' + plan.value if plan.value != 'free' else '' }}" class="btn w-full">
-          {{ "Get started free" if plan.value == "free" else "Sign up" }}
-        </a>
-      </section>
+      </div>
+      <ul class="flex flex-col gap-2.5 text-sm">
+        <li class="flex items-center gap-2.5">
+          <span class="text-primary">{{ icon('check', 'size-4') }}</span>{{ limits.max_users or "Unlimited" }} users
+        </li>
+        <li class="flex items-center gap-2.5">
+          <span class="text-primary">{{ icon('check', 'size-4') }}</span>{{ limits.max_contracts or "Unlimited" }} contracts
+        </li>
+        <li class="flex items-center gap-2.5 {{ '' if limits.ai_enabled else 'text-muted-foreground' }}">
+          <span class="{{ 'text-primary' if limits.ai_enabled else 'text-muted-foreground/50' }}">
+            {{ icon('check' if limits.ai_enabled else 'circle', 'size-4') }}
+          </span>{{ "AI summaries & assistant" if limits.ai_enabled else "No AI features" }}
+        </li>
+        <li class="flex items-center gap-2.5">
+          <span class="text-primary">{{ icon('check', 'size-4') }}</span>Role-based permissions
+        </li>
+      </ul>
+      <a href="/signup{{ '?plan=' + plan.value if plan.value != 'free' else '' }}"
+         class="btn mt-auto w-full" {% if not popular %}data-variant="outline"{% endif %} hx-boost="false">
+        {{ "Get started free" if plan.value == "free" else "Choose " + limits.display_name }}
+      </a>
     </div>
     {% endfor %}
   </div>
+
+  <p class="text-center text-sm text-muted-foreground">
+    All plans include the full workflow engine, multi-document contracts, and audit history.
+  </p>
 </div>
 {% endblock %}

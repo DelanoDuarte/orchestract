@@ -56,18 +56,27 @@ step:
 - Basecoat's CDN CSS provides the component classes (`.btn`, `.card`, `.badge`, `.sidebar`,
   `.field`, `.table`, ...) and loads *after* Tailwind so its component styles win over Tailwind's
   preflight reset, per Basecoat's documented load order.
-- `app/web/static/theme.css` overrides Basecoat's shadcn-compatible CSS variables
-  (`--background`, `--primary`, `--accent`, ...) with a dark teal/amber palette, and defines the
-  `.step-pipeline`/`.step-pill` classes used for the lifecycle graph banner.
+- `app/web/static/theme.css` is the design system: it overrides Basecoat's shadcn-compatible CSS
+  variables (`--background`, `--primary`, `--accent`, ...) with a dark teal/amber palette and adds
+  elevation/motion tokens, refined component styling (cards, tables, sidebar, inputs, badges), the
+  `.step-pipeline`/`.step-pill` lifecycle graph, and reusable helpers (`.page`, `.icon-chip`,
+  `.stat-card`, `.empty-state`, `.surface-gradient`). Reusable Jinja layout macros
+  (`page_header`, `stat_card`, `empty_state`) live in `app/web/templates/_macros.html`.
+- SPA-like navigation via [htmx](https://htmx.org) (CDN, no build): `<body hx-boost>` turns
+  same-origin navigation into an AJAX swap of just `<main id="page-main">` (with the View
+  Transitions API for a flicker-free cross-fade), so the sidebar/header persist and only the page
+  content changes. `htmx-config` `responseHandling` also swaps `400`/`422` so re-rendered form
+  validation errors still update the view. Auth/logout forms that change the logged-in/out chrome
+  opt out with `hx-boost="false"`; the sidebar's active item is re-synced after each swap.
 - `app/web/icons.py` inlines Lucide SVGs (vendored in `app/web/icons/`) as a Jinja global `icon()`,
   plus a `step_icon()` mapping from workflow step key to icon name.
 - Dark/light mode is class-based (`<html class="dark">`) with a toggle button using
   `window.basecoat.theme.toggle()`; a `@custom-variant dark (&:is(html.dark *));` declaration keeps
   Tailwind's `dark:` utilities in sync with Basecoat's toggle instead of the OS-preference default.
 
-Note: both CDN scripts are explicitly documented as dev/prototyping tools, not for production —
-swap them for a real Tailwind build + `basecoat-css` npm package (see their install docs) before
-shipping.
+Note: the Tailwind browser build and Basecoat CDN CSS are explicitly documented as dev/prototyping
+tools, not for production — swap them for a real Tailwind build + `basecoat-css` npm package (see
+their install docs) before shipping. htmx is loaded from CDN too; pin/vendor it for production.
 
 ## File storage
 

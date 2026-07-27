@@ -1,30 +1,36 @@
 {% extends "base.html" %}
 {% block title %}New agent{% endblock %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-semibold tracking-tight">New agent</h1>
-  <p class="text-sm text-muted-foreground">e.g. Legal, Finance, Compliance.</p>
-</div>
+<div class="page-narrow reveal">
+  <a href="/{{ organization.slug }}/agents" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    {{ icon('arrow-right', 'size-4 rotate-180') }}<span>All agents</span>
+  </a>
+  <div class="mb-6 flex items-start gap-3">
+    <span class="icon-chip">{{ icon('users', 'size-5') }}</span>
+    <div class="space-y-1">
+      <h1 class="page-title">New agent</h1>
+      <p class="text-sm text-muted-foreground">A department or participant, e.g. Legal, Finance, Compliance.</p>
+    </div>
+  </div>
 
-{% if error %}
-<div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
-{% endif %}
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
 
-<div class="card mx-auto max-w-lg" data-size="sm">
-  <section>
+  <div class="card p-6">
     <form method="post" action="/{{ organization.slug }}/agents" class="flex flex-col gap-4">
       <div role="group" class="field">
         <label for="agent-name">Name</label>
-        <input id="agent-name" type="text" name="name" required>
+        <input id="agent-name" type="text" name="name" required placeholder="e.g. Legal">
       </div>
       <div role="group" class="field">
         <label for="agent-description">Description</label>
-        <input id="agent-description" type="text" name="description">
+        <input id="agent-description" type="text" name="description" placeholder="Optional">
       </div>
       {% if roles %}
       <div role="group" class="field">
         <label>Linked roles</label>
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-2 rounded-[var(--radius)] border border-border p-3">
           {% for role in roles %}
           <label class="flex items-center gap-2 text-sm font-normal">
             <input type="checkbox" name="role_ids" value="{{ role.id }}">
@@ -38,6 +44,6 @@
       {% endif %}
       <button type="submit" class="btn w-full">Create agent</button>
     </form>
-  </section>
+  </div>
 </div>
 {% endblock %}

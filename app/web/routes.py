@@ -8,6 +8,8 @@ from fastapi.templating import Jinja2Templates
 from app.api.deps import (
     SESSION_COOKIE_NAME,
     agent_service,
+    ai_service,
+    contract_service,
     current_role_for_template,
     current_user_dep,
     current_user_for_template,
@@ -20,6 +22,7 @@ from app.api.deps import (
     user_service,
     workflow_service,
 )
+from app.application.permissions import assert_can_edit_contract_step
 from app.config import get_settings
 from app.domain.shared.exceptions import DomainError
 from app.domain.storage.models import StorageProvider
@@ -27,6 +30,7 @@ from app.domain.tenancy.models import Organization
 from app.domain.users.exceptions import InvalidCredentialsError, PermissionDeniedError
 from app.domain.users.models import User
 from app.domain.workflow.models import WorkflowDefinition, WorkflowStatus
+from app.infrastructure.ai.client import ai_enabled
 from app.web.icons import icon, step_icon_name
 
 OAUTH_PROVIDER_LABELS = {StorageProvider.GOOGLE_DRIVE: "Google Drive", StorageProvider.ONEDRIVE: "OneDrive"}
@@ -51,15 +55,15 @@ def _step_and_agent(definition: WorkflowDefinition, step_key: str, agent_names: 
     return step.name, agent_names.get(step.agent_id, f"agent #{step.agent_id}")
 
 
-async def _document_rows_with_step_info(organization_id: int, documents: list) -> list[dict]:
-    """Enriches raw Documents with their live workflow instance/definition
+async def _contract_rows_with_step_info(organization_id: int, contracts: list) -> list[dict]:
+    """Enriches raw Contracts with their live workflow instance/definition
     so a template can render the current step and lifecycle pipeline
-    (used by both the Dashboard and Documents list "Preview" dialogs)."""
+    (used by both the Dashboard and Contracts list "Preview" dialogs)."""
     agent_names = await _agent_names(organization_id)
     definitions_cache: dict[int, WorkflowDefinition] = {}
     rows = []
-    for document in documents:
-        instance = await document_service.get_instance(document.id)
+    for contract in contracts:
+        instance = await contract_service.get_instance(contract.id)
         definition = definitions_cache.get(instance.workflow_definition_id)
         if definition is None:
             definition = await workflow_service.get(instance.workflow_definition_id)
@@ -67,7 +71,7 @@ async def _document_rows_with_step_info(organization_id: int, documents: list) -
         step_name, agent_name = _step_and_agent(definition, instance.current_step_key, agent_names)
         rows.append(
             {
-                "document": document,
+                "contract": contract,
                 "instance": instance,
                 "definition": definition,
                 "step_name": step_name,
@@ -79,15 +83,11 @@ async def _document_rows_with_step_info(organization_id: int, documents: list) -
     return rows
 
 
-async def _assert_can_edit_current_step(document_id: int, current_user: User) -> None:
-    """Defense in depth: the document_detail template already hides the
+async def _assert_can_edit_current_step(contract_id: int, current_user: User) -> None:
+    """Defense in depth: the contract_detail template already hides the
     edit forms when this would fail, but every mutating route re-checks
     server-side before touching anything."""
-    instance = await document_service.get_instance(document_id)
-    definition = await workflow_service.get(instance.workflow_definition_id)
-    step = definition.get_step(instance.current_step_key)
-    if not await role_service.can_edit_step(current_user, step.agent_id):
-        raise PermissionDeniedError()
+    await assert_can_edit_contract_step(contract_service, workflow_service, role_service, contract_id, current_user)
 
 
 @root_router.get("/")
@@ -140,13 +140,13 @@ async def logout(request: Request):
 async def dashboard(
     request: Request, organization: Organization = Depends(get_current_organization_from_path)
 ):
-    documents = await document_service.list_for_organization(organization.id)
-    rows = await _document_rows_with_step_info(organization.id, documents)
+    contracts = await contract_service.list_for_organization(organization.id)
+    rows = await _contract_rows_with_step_info(organization.id, contracts)
     active_count = sum(1 for row in rows if row["status"] == "active")
     stats = [
         {"label": "In progress", "value": active_count},
         {"label": "Completed", "value": len(rows) - active_count},
-        {"label": "Total documents", "value": len(rows)},
+        {"label": "Total contracts", "value": len(rows)},
     ]
     return templates.TemplateResponse(
         request,
@@ -645,83 +645,83 @@ async def activate_workflow(
     return await workflow_detail(definition_id, request, organization)
 
 
-@org_router.get("/documents")
-async def documents_page(
+@org_router.get("/contracts")
+async def contracts_page(
     request: Request,
     organization: Organization = Depends(get_current_organization_from_path),
     q: str = "",
-    doc_type: str = "",
+    contract_type: str = "",
 ):
-    all_documents = await document_service.list_for_organization(organization.id)
-    doc_types = sorted({document.document_type for document in all_documents})
-    documents = all_documents
+    all_contracts = await contract_service.list_for_organization(organization.id)
+    contract_types = sorted({contract.contract_type for contract in all_contracts})
+    contracts = all_contracts
     if q:
         needle = q.lower()
-        documents = [d for d in documents if needle in d.title.lower()]
-    if doc_type:
-        documents = [d for d in documents if d.document_type == doc_type]
-    rows = await _document_rows_with_step_info(organization.id, documents)
+        contracts = [c for c in contracts if needle in c.title.lower()]
+    if contract_type:
+        contracts = [c for c in contracts if c.contract_type == contract_type]
+    rows = await _contract_rows_with_step_info(organization.id, contracts)
     return templates.TemplateResponse(
         request,
-        "documents_list.html",
+        "contracts_list.html",
         {
             "organization": organization,
             "rows": rows,
-            "doc_types": doc_types,
+            "contract_types": contract_types,
             "search_query": q,
-            "active_type": doc_type,
-            "active_nav": "documents",
+            "active_type": contract_type,
+            "active_nav": "contracts",
         },
     )
 
 
-@org_router.get("/documents/new")
-async def new_document_page(
+@org_router.get("/contracts/new")
+async def new_contract_page(
     request: Request, organization: Organization = Depends(get_current_organization_from_path)
 ):
     workflows = await workflow_service.list_for_organization(organization.id)
     active_workflows = [wf for wf in workflows if wf.status == WorkflowStatus.ACTIVE]
     return templates.TemplateResponse(
         request,
-        "document_new.html",
-        {"organization": organization, "workflows": active_workflows, "active_nav": "documents"},
+        "contract_new.html",
+        {"organization": organization, "workflows": active_workflows, "active_nav": "contracts"},
     )
 
 
-@org_router.post("/documents")
-async def create_document(
+@org_router.post("/contracts")
+async def create_contract(
     request: Request,
     title: str = Form(...),
-    document_type: str = Form(...),
+    contract_type: str = Form(...),
     workflow_definition_id: int = Form(...),
     description: str = Form(""),
     organization: Organization = Depends(get_current_organization_from_path),
     current_user: User = Depends(current_user_dep),
 ):
     try:
-        document = await document_service.create_document(
-            organization.id, title, document_type, workflow_definition_id, current_user.name, description or None
+        contract = await contract_service.create_contract(
+            organization.id, title, contract_type, workflow_definition_id, current_user.name, description or None
         )
     except DomainError as exc:
         workflows = await workflow_service.list_for_organization(organization.id)
         active_workflows = [wf for wf in workflows if wf.status == WorkflowStatus.ACTIVE]
         return templates.TemplateResponse(
             request,
-            "document_new.html",
+            "contract_new.html",
             {
                 "organization": organization,
                 "workflows": active_workflows,
-                "active_nav": "documents",
+                "active_nav": "contracts",
                 "error": str(exc),
             },
             status_code=422,
         )
-    return await document_detail(document.id, request, organization, current_user)
+    return await contract_detail(contract.id, request, organization, current_user)
 
 
-async def _document_detail_context(organization: Organization, document_id: int, current_user: User) -> dict:
-    document = await document_service.get(document_id)
-    instance = await document_service.get_instance(document_id)
+async def _contract_detail_context(organization: Organization, contract_id: int, current_user: User) -> dict:
+    contract = await contract_service.get(contract_id)
+    instance = await contract_service.get_instance(contract_id)
     definition = await workflow_service.get(instance.workflow_definition_id)
     agent_names = await _agent_names(organization.id)
     step_name, agent_name = _step_and_agent(definition, instance.current_step_key, agent_names)
@@ -734,9 +734,10 @@ async def _document_detail_context(organization: Organization, document_id: int,
     current_step_agent_id = definition.get_step(instance.current_step_key).agent_id
     can_edit = await role_service.can_edit_step(current_user, current_step_agent_id)
     edit_roles = await role_service.list_for_agent(current_step_agent_id)
+    total_versions = sum(len(document.versions) for document in contract.documents)
     return {
         "organization": organization,
-        "document": document,
+        "contract": contract,
         "instance": instance,
         "definition": definition,
         "current_step_name": step_name,
@@ -746,26 +747,28 @@ async def _document_detail_context(organization: Organization, document_id: int,
         "oauth_provider_labels": OAUTH_PROVIDER_LABELS,
         "steps_traveled": steps_traveled,
         "total_steps": len(definition.steps),
+        "total_versions": total_versions,
         "can_edit": can_edit,
         "edit_role_names": [role.name for role in edit_roles],
-        "active_nav": "documents",
+        "ai_enabled": ai_enabled(),
+        "active_nav": "contracts",
     }
 
 
-@org_router.get("/documents/{document_id}")
-async def document_detail(
-    document_id: int,
+@org_router.get("/contracts/{contract_id}")
+async def contract_detail(
+    contract_id: int,
     request: Request,
     organization: Organization = Depends(get_current_organization_from_path),
     current_user: User = Depends(current_user_dep),
 ):
-    context = await _document_detail_context(organization, document_id, current_user)
-    return templates.TemplateResponse(request, "document_detail.html", context)
+    context = await _contract_detail_context(organization, contract_id, current_user)
+    return templates.TemplateResponse(request, "contract_detail.html", context)
 
 
-@org_router.post("/documents/{document_id}/transitions")
+@org_router.post("/contracts/{contract_id}/transitions")
 async def execute_transition(
-    document_id: int,
+    contract_id: int,
     request: Request,
     action_name: str = Form(...),
     comment: str = Form(""),
@@ -773,17 +776,36 @@ async def execute_transition(
     current_user: User = Depends(current_user_dep),
 ):
     try:
-        await _assert_can_edit_current_step(document_id, current_user)
-        await document_service.transition_document(document_id, action_name, current_user.name, comment or None)
+        await _assert_can_edit_current_step(contract_id, current_user)
+        await contract_service.transition_contract(contract_id, action_name, current_user.name, comment or None)
     except DomainError as exc:
-        context = await _document_detail_context(organization, document_id, current_user)
+        context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
-        return templates.TemplateResponse(request, "document_detail.html", context, status_code=422)
-    return await document_detail(document_id, request, organization, current_user)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return await contract_detail(contract_id, request, organization, current_user)
 
 
-@org_router.post("/documents/{document_id}/versions")
+@org_router.post("/contracts/{contract_id}/documents")
+async def add_document_to_contract(
+    contract_id: int,
+    request: Request,
+    name: str = Form(...),
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    try:
+        await _assert_can_edit_current_step(contract_id, current_user)
+        await contract_service.add_document(contract_id, name)
+    except DomainError as exc:
+        context = await _contract_detail_context(organization, contract_id, current_user)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return await contract_detail(contract_id, request, organization, current_user)
+
+
+@org_router.post("/contracts/{contract_id}/documents/{document_id}/versions")
 async def upload_version(
+    contract_id: int,
     document_id: int,
     request: Request,
     file: UploadFile,
@@ -792,7 +814,7 @@ async def upload_version(
     current_user: User = Depends(current_user_dep),
 ):
     try:
-        await _assert_can_edit_current_step(document_id, current_user)
+        await _assert_can_edit_current_step(contract_id, current_user)
         content = await file.read()
         await document_service.upload_version(
             document_id,
@@ -803,14 +825,15 @@ async def upload_version(
             notes or None,
         )
     except DomainError as exc:
-        context = await _document_detail_context(organization, document_id, current_user)
+        context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
-        return templates.TemplateResponse(request, "document_detail.html", context, status_code=422)
-    return await document_detail(document_id, request, organization, current_user)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return await contract_detail(contract_id, request, organization, current_user)
 
 
-@org_router.get("/documents/{document_id}/import/{connection_id}")
+@org_router.get("/contracts/{contract_id}/documents/{document_id}/import/{connection_id}")
 async def import_browser_page(
+    contract_id: int,
     document_id: int,
     connection_id: int,
     request: Request,
@@ -819,9 +842,9 @@ async def import_browser_page(
     current_user: User = Depends(current_user_dep),
 ):
     try:
-        await _assert_can_edit_current_step(document_id, current_user)
+        await _assert_can_edit_current_step(contract_id, current_user)
     except PermissionDeniedError:
-        return RedirectResponse(f"/{organization.slug}/documents/{document_id}", status_code=303)
+        return RedirectResponse(f"/{organization.slug}/contracts/{contract_id}", status_code=303)
     document = await document_service.get(document_id)
     connection = await storage_service.get(connection_id)
     files = await storage_service.browse_external_files(connection_id, folder_id)
@@ -830,16 +853,18 @@ async def import_browser_page(
         "document_import_browser.html",
         {
             "organization": organization,
+            "contract_id": contract_id,
             "document": document,
             "connection": connection,
             "files": files,
-            "active_nav": "documents",
+            "active_nav": "contracts",
         },
     )
 
 
-@org_router.post("/documents/{document_id}/import/{connection_id}")
+@org_router.post("/contracts/{contract_id}/documents/{document_id}/import/{connection_id}")
 async def import_version(
+    contract_id: int,
     document_id: int,
     connection_id: int,
     request: Request,
@@ -849,12 +874,63 @@ async def import_version(
     current_user: User = Depends(current_user_dep),
 ):
     try:
-        await _assert_can_edit_current_step(document_id, current_user)
+        await _assert_can_edit_current_step(contract_id, current_user)
         await document_service.import_version_from_external(
             document_id, connection_id, external_file_id, current_user.name, notes or None
         )
     except DomainError as exc:
-        context = await _document_detail_context(organization, document_id, current_user)
+        context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
-        return templates.TemplateResponse(request, "document_detail.html", context, status_code=422)
-    return await document_detail(document_id, request, organization, current_user)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return await contract_detail(contract_id, request, organization, current_user)
+
+
+@org_router.post("/contracts/{contract_id}/summarize")
+async def summarize_contract(
+    contract_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    try:
+        await ai_service.summarize_contract(contract_id)
+    except DomainError as exc:
+        context = await _contract_detail_context(organization, contract_id, current_user)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return await contract_detail(contract_id, request, organization, current_user)
+
+
+@org_router.post("/contracts/{contract_id}/documents/{document_id}/summarize")
+async def summarize_document(
+    contract_id: int,
+    document_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    try:
+        await ai_service.summarize_document(document_id)
+    except DomainError as exc:
+        context = await _contract_detail_context(organization, contract_id, current_user)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return await contract_detail(contract_id, request, organization, current_user)
+
+
+@org_router.post("/contracts/{contract_id}/assistant")
+async def run_assistant(
+    contract_id: int,
+    request: Request,
+    instruction: str = Form(...),
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    context = await _contract_detail_context(organization, contract_id, current_user)
+    context["assistant_instruction"] = instruction
+    try:
+        context["assistant_result"] = await ai_service.run_assistant(contract_id, instruction, current_user)
+    except DomainError as exc:
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return templates.TemplateResponse(request, "contract_detail.html", context)

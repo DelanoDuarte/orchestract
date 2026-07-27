@@ -10,6 +10,7 @@ import asyncio
 
 from app.api.deps import (
     agent_service,
+    contract_service,
     document_service,
     organization_service,
     role_service,
@@ -128,7 +129,7 @@ async def main() -> None:
     definition = await workflow_service.activate(definition.id)
     print(f"Created and activated workflow: {definition.name}")
 
-    document = await document_service.create_document(
+    contract = await contract_service.create_contract(
         organization.id,
         "Vendor Services Agreement",
         "MSA",
@@ -136,7 +137,11 @@ async def main() -> None:
         actor="seed-script",
         description="Sample contract to explore the workflow with.",
     )
-    print(f"Created sample document: {document.title} (id={document.id})")
+    main_document = contract.documents[0]
+    print(f"Created sample contract: {contract.title} (id={contract.id}), document: {main_document.name}")
+
+    exhibit = await contract_service.add_document(contract.id, "Exhibit A — Service Levels")
+    print(f"Added a second document: {exhibit.name}")
 
     storage_connection = await storage_service.connect_bucket(
         organization.id,
@@ -147,15 +152,43 @@ async def main() -> None:
     )
     print(f"Connected storage backend: {storage_connection.display_name} ({storage_connection.provider.value})")
 
-    version = await document_service.upload_version(
-        document.id,
-        file_bytes=b"This is a placeholder contract body for the seeded demo document.\n",
+    main_version = await document_service.upload_version(
+        main_document.id,
+        file_bytes=(
+            b"Vendor Services Agreement\n\n"
+            b"This agreement is between Acme Corp (\"Customer\") and the Vendor for the provision of "
+            b"logistics and fulfillment services. The Vendor agrees to fulfill orders within 2 business "
+            b"days, maintain 99.5% inventory accuracy, and provide monthly reporting. Fees are billed "
+            b"monthly in arrears at the rates set out in Exhibit A. Either party may terminate this "
+            b"agreement with 60 days' written notice. This agreement renews automatically for one-year "
+            b"terms unless either party gives notice of non-renewal at least 30 days before expiry.\n"
+        ),
         filename="vendor-services-agreement-v1.txt",
         content_type="text/plain",
         uploaded_by="seed-script",
         notes="Initial draft.",
     )
-    print(f"Uploaded version {version.version_no} ({version.size_bytes} bytes) to {version.storage_key}")
+    print(f"Uploaded version {main_version.version_no} ({main_version.size_bytes} bytes) to {main_version.storage_key}")
+
+    exhibit_version = await document_service.upload_version(
+        exhibit.id,
+        file_bytes=(
+            b"Exhibit A - Service Levels and Fees\n\n"
+            b"Order fulfillment: 2 business days from receipt. Inventory accuracy: 99.5% minimum, audited "
+            b"quarterly. Reporting: monthly summary delivered by the 5th business day of the following "
+            b"month. Base fee: $4,200/month, covering up to 5,000 orders; $0.65 per order thereafter. "
+            b"Late shipment penalty: 2% fee credit per day beyond the 2-day SLA, capped at 20% of that "
+            b"month's fee.\n"
+        ),
+        filename="exhibit-a-service-levels-v1.txt",
+        content_type="text/plain",
+        uploaded_by="seed-script",
+        notes="Initial draft.",
+    )
+    print(
+        f"Uploaded version {exhibit_version.version_no} ({exhibit_version.size_bytes} bytes) "
+        f"to {exhibit_version.storage_key}"
+    )
     print(f"\nVisit http://127.0.0.1:8000/{organization.slug}/ once the server is running.")
 
 

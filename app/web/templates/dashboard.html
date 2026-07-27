@@ -5,10 +5,10 @@
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
   <div>
     <h1 class="text-2xl font-semibold tracking-tight">{{ organization.name }}</h1>
-    <p class="text-sm text-muted-foreground">Documents currently moving through a workflow.</p>
+    <p class="text-sm text-muted-foreground">Contracts currently moving through a workflow.</p>
   </div>
-  <a href="/{{ organization.slug }}/documents/new" class="btn">
-    {{ icon('plus', 'size-4') }}<span>New document</span>
+  <a href="/{{ organization.slug }}/contracts/new" class="btn">
+    {{ icon('plus', 'size-4') }}<span>New contract</span>
   </a>
 </div>
 
@@ -25,7 +25,7 @@
   <header>
     <h2>In progress</h2>
     <div class="card-action">
-      <span class="text-xs text-muted-foreground">{{ rows|length }} documents</span>
+      <span class="text-xs text-muted-foreground">{{ rows|length }} contracts</span>
     </div>
   </header>
   <div class="table-container">
@@ -43,8 +43,8 @@
       <tbody>
         {% for row in rows %}
         <tr>
-          <td class="font-medium">{{ row.document.title }}</td>
-          <td>{{ row.document.document_type }}</td>
+          <td class="font-medium">{{ row.contract.title }}</td>
+          <td>{{ row.contract.contract_type }}</td>
           <td>
             <span class="inline-flex items-center gap-1.5">
               <span class="text-muted-foreground">{{ icon(row.step_icon, 'size-4') }}</span>
@@ -61,16 +61,16 @@
           </td>
           <td class="text-end">
             <button type="button" class="btn" data-variant="ghost" data-size="sm"
-                    onclick="document.getElementById('preview-{{ row.document.id }}').showModal()">
+                    onclick="document.getElementById('preview-{{ row.contract.id }}').showModal()">
               {{ icon('layers', 'size-4') }}<span>Preview</span>
             </button>
-            <a href="/{{ organization.slug }}/documents/{{ row.document.id }}" class="btn" data-variant="ghost" data-size="sm">
+            <a href="/{{ organization.slug }}/contracts/{{ row.contract.id }}" class="btn" data-variant="ghost" data-size="sm">
               View{{ icon('chevron-right', 'size-4') }}
             </a>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted-foreground">No documents yet.</td></tr>
+        <tr><td colspan="6" class="text-center text-muted-foreground">No contracts yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -78,11 +78,11 @@
 </div>
 
 {% for row in rows %}
-<dialog id="preview-{{ row.document.id }}" class="dialog">
+<dialog id="preview-{{ row.contract.id }}" class="dialog">
   <article>
     <header>
-      <h2>{{ row.document.title }}</h2>
-      <p>{{ row.document.document_type }}</p>
+      <h2>{{ row.contract.title }}</h2>
+      <p>{{ row.contract.contract_type }}</p>
     </header>
     <section class="flex flex-col gap-4">
       <div class="flex items-center justify-between text-sm">
@@ -100,7 +100,7 @@
     </section>
     <footer class="flex justify-end gap-2">
       <button type="button" class="btn" data-variant="ghost" onclick="this.closest('dialog').close()">Close</button>
-      <a href="/{{ organization.slug }}/documents/{{ row.document.id }}" class="btn">View full details</a>
+      <a href="/{{ organization.slug }}/contracts/{{ row.contract.id }}" class="btn">View full details</a>
     </footer>
   </article>
 </dialog>

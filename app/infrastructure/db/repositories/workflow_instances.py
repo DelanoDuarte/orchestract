@@ -17,10 +17,10 @@ class SqlAlchemyWorkflowInstanceRepository:
     async def get(self, instance_id: int) -> WorkflowInstance | None:
         return await self._session.get(WorkflowInstance, instance_id)
 
-    async def get_for_document(self, document_id: int) -> WorkflowInstance | None:
+    async def get_for_contract(self, contract_id: int) -> WorkflowInstance | None:
         result = await self._session.execute(
             select(WorkflowInstance)
-            .where(WorkflowInstance.document_id == document_id)
+            .where(WorkflowInstance.contract_id == contract_id)
             .order_by(WorkflowInstance.started_at.desc())
         )
         return result.scalars().first()

@@ -41,17 +41,17 @@ class WorkflowHistoryEntry(Base):
 
 
 class WorkflowInstance(Base):
-    """Aggregate root tracking one document's live run through a WorkflowDefinition.
+    """Aggregate root tracking one contract's live run through a WorkflowDefinition.
 
-    References `document_id` and `workflow_definition_id` by id only (not by
-    relationship) so this aggregate stays independent of the Document and
+    References `contract_id` and `workflow_definition_id` by id only (not by
+    relationship) so this aggregate stays independent of the Contract and
     WorkflowDefinition aggregates, per DDD aggregate boundaries.
     """
 
     __tablename__ = "workflow_instances"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.id"), index=True)
     workflow_definition_id: Mapped[int] = mapped_column(ForeignKey("workflow_definitions.id"), index=True)
     current_step_key: Mapped[str] = mapped_column(String(80))
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus), default=InstanceStatus.ACTIVE)
@@ -66,12 +66,12 @@ class WorkflowInstance(Base):
     )
 
     @classmethod
-    def start(cls, document_id: int, definition: "WorkflowDefinition", actor: str) -> "WorkflowInstance":
+    def start(cls, contract_id: int, definition: "WorkflowDefinition", actor: str) -> "WorkflowInstance":
         if definition.status != WorkflowStatus.ACTIVE:
             raise InactiveWorkflowError(definition.id)
         initial = definition.initial_step()
         instance = cls(
-            document_id=document_id,
+            contract_id=contract_id,
             workflow_definition_id=definition.id,
             current_step_key=initial.key,
             status=InstanceStatus.ACTIVE,

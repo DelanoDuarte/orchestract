@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import NotAuthenticatedError
-from app.api.routers import agents, documents, organizations, storage, workflows
+from app.api.routers import agents, contracts, documents, organizations, storage, workflows
 from app.domain.shared.exceptions import ConflictError, DomainError, NotFoundError
 from app.web.routes import org_router, root_router
 
@@ -33,6 +33,7 @@ async def handle_domain_error(request: Request, exc: DomainError) -> JSONRespons
 app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
+app.include_router(contracts.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(storage.router, prefix="/api/v1")
 

@@ -1,6 +1,8 @@
 from fastapi import Depends, Header, Request
 
 from app.application.agent_service import AgentService
+from app.application.ai_service import AIService
+from app.application.contract_service import ContractService
 from app.application.document_service import DocumentService
 from app.application.organization_service import OrganizationService
 from app.application.role_service import RoleService
@@ -34,8 +36,10 @@ agent_service = AgentService(uow_factory)
 workflow_service = WorkflowService(uow_factory)
 storage_service = StorageService(uow_factory)
 document_service = DocumentService(uow_factory, storage_service)
+contract_service = ContractService(uow_factory)
 role_service = RoleService(uow_factory)
 user_service = UserService(uow_factory)
+ai_service = AIService(contract_service, document_service, role_service, workflow_service)
 
 
 def get_organization_service() -> OrganizationService:
@@ -52,6 +56,14 @@ def get_workflow_service() -> WorkflowService:
 
 def get_document_service() -> DocumentService:
     return document_service
+
+
+def get_contract_service() -> ContractService:
+    return contract_service
+
+
+def get_ai_service() -> AIService:
+    return ai_service
 
 
 def get_storage_service() -> StorageService:

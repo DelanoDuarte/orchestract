@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}New document{% endblock %}
+{% block title %}New contract{% endblock %}
 {% block content %}
 <div class="mb-6">
-  <h1 class="text-2xl font-semibold tracking-tight">New document</h1>
+  <h1 class="text-2xl font-semibold tracking-tight">New contract</h1>
   <p class="text-sm text-muted-foreground">Starts running through the workflow you pick immediately.</p>
 </div>
 
@@ -13,22 +13,22 @@
 <div class="card mx-auto max-w-lg" data-size="sm">
   <section>
     {% if workflows %}
-    <form method="post" action="/{{ organization.slug }}/documents" class="flex flex-col gap-4">
+    <form method="post" action="/{{ organization.slug }}/contracts" class="flex flex-col gap-4">
       <div role="group" class="field">
-        <label for="doc-title">Title</label>
-        <input id="doc-title" type="text" name="title" required>
+        <label for="contract-title">Title</label>
+        <input id="contract-title" type="text" name="title" required>
       </div>
       <div role="group" class="field">
-        <label for="doc-type">Type</label>
-        <input id="doc-type" type="text" name="document_type" required placeholder="e.g. NDA, MSA">
+        <label for="contract-type">Type</label>
+        <input id="contract-type" type="text" name="contract_type" required placeholder="e.g. NDA, MSA">
       </div>
       <div role="group" class="field">
-        <label for="doc-description">Description</label>
-        <input id="doc-description" type="text" name="description">
+        <label for="contract-description">Description</label>
+        <input id="contract-description" type="text" name="description">
       </div>
       <div role="group" class="field">
-        <label for="doc-workflow">Workflow</label>
-        <select id="doc-workflow" name="workflow_definition_id" class="select w-full" required>
+        <label for="contract-workflow">Workflow</label>
+        <select id="contract-workflow" name="workflow_definition_id" class="select w-full" required>
           {% for wf in workflows %}<option value="{{ wf.id }}">{{ wf.name }}</option>{% endfor %}
         </select>
       </div>

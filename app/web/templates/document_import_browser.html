@@ -4,7 +4,7 @@
 <div class="mb-6">
   <h1 class="text-2xl font-semibold tracking-tight">Import a file from {{ connection.display_name }}</h1>
   <p class="text-sm text-muted-foreground">
-    Picking a file copies its current contents into <strong>{{ document.title }}</strong> as a new version.
+    Picking a file copies its current contents into <strong>{{ document.name }}</strong> as a new version.
   </p>
 </div>
 
@@ -19,7 +19,7 @@
           <td class="text-muted-foreground">{{ file.mime_type }}</td>
           <td class="text-muted-foreground">{{ "%d KB"|format(file.size // 1024) if file.size else "—" }}</td>
           <td class="text-end">
-            <form method="post" action="/{{ organization.slug }}/documents/{{ document.id }}/import/{{ connection.id }}"
+            <form method="post" action="/{{ organization.slug }}/contracts/{{ contract_id }}/documents/{{ document.id }}/import/{{ connection.id }}"
                   class="flex flex-wrap items-center justify-end gap-2">
               <input type="hidden" name="external_file_id" value="{{ file.id }}">
               <input type="text" name="notes" placeholder="Notes (optional)" class="w-40">
@@ -36,8 +36,8 @@
 </div>
 
 <p class="mt-4">
-  <a href="/{{ organization.slug }}/documents/{{ document.id }}" class="btn" data-variant="ghost">
-    {{ icon('arrow-right', 'size-4 rotate-180') }}<span>Back to document</span>
+  <a href="/{{ organization.slug }}/contracts/{{ contract_id }}" class="btn" data-variant="ghost">
+    {{ icon('arrow-right', 'size-4 rotate-180') }}<span>Back to contract</span>
   </a>
 </p>
 {% endblock %}

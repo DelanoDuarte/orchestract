@@ -1,12 +1,16 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.documents.exceptions import EmptyDocumentTitleError
+from app.domain.documents.exceptions import EmptyDocumentNameError
 from app.domain.shared.base import Base
 from app.domain.shared.types import utcnow
 from app.domain.storage.models import StorageProvider
+
+if TYPE_CHECKING:
+    from app.domain.contracts.models import Contract
 
 
 class DocumentVersion(Base):
@@ -40,24 +44,24 @@ class DocumentVersion(Base):
 
 
 class Document(Base):
-    """Aggregate root for a contract/document being orchestrated through a workflow.
-
-    Which workflow it is running, and where it currently stands, lives in
-    the separate WorkflowInstance aggregate (referenced by id) -- this
-    aggregate only owns the document's own identity and version history.
+    """A single named file (e.g. "Main Agreement", "Exhibit A") owned by a
+    Contract, with its own version history. Several Documents can belong to
+    the same Contract -- the Contract is what moves through the workflow,
+    not any one Document.
     """
 
     __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
-    title: Mapped[str] = mapped_column(String(300))
-    description: Mapped[str | None] = mapped_column(Text, default=None)
-    document_type: Mapped[str] = mapped_column(String(100))
+    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.id"), index=True)
+    name: Mapped[str] = mapped_column(String(300))
     current_version_no: Mapped[int] = mapped_column(default=0)
+    summary: Mapped[str | None] = mapped_column(Text, default=None)
+    summary_generated_at: Mapped[datetime | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow)
 
+    contract: Mapped["Contract"] = relationship(back_populates="documents")
     versions: Mapped[list[DocumentVersion]] = relationship(
         back_populates="document",
         cascade="all, delete-orphan",
@@ -66,19 +70,11 @@ class Document(Base):
     )
 
     @classmethod
-    def create(
-        cls, organization_id: int, title: str, document_type: str, description: str | None = None
-    ) -> "Document":
-        title = title.strip()
-        if not title:
-            raise EmptyDocumentTitleError()
-        return cls(
-            organization_id=organization_id,
-            title=title,
-            description=description,
-            document_type=document_type,
-            current_version_no=0,
-        )
+    def create(cls, name: str) -> "Document":
+        name = name.strip()
+        if not name:
+            raise EmptyDocumentNameError()
+        return cls(name=name, current_version_no=0)
 
     def add_version(
         self,
@@ -111,3 +107,7 @@ class Document(Base):
 
     def latest_version(self) -> DocumentVersion | None:
         return self.versions[-1] if self.versions else None
+
+    def set_summary(self, summary: str) -> None:
+        self.summary = summary
+        self.summary_generated_at = utcnow()

@@ -6,8 +6,6 @@ from app.domain.documents.models import Document, DocumentVersion
 from app.domain.shared.exceptions import NotFoundError
 from app.domain.storage.exceptions import NoPrimaryStorageConnectionError
 from app.domain.storage.models import StorageProvider
-from app.domain.workflow.models import WorkflowTransition
-from app.domain.workflow_instances.models import WorkflowInstance
 from app.infrastructure.db.unit_of_work import UnitOfWork
 from app.infrastructure.storage.factory import build_file_storage
 
@@ -19,36 +17,15 @@ def _safe_filename(name: str) -> str:
 
 
 class DocumentService:
-    """Orchestrates the Document, WorkflowDefinition, WorkflowInstance, and
-    (for version uploads) StorageConnection aggregates for use cases that
-    span more than one of them. This kind of cross-aggregate coordination
+    """Orchestrates the Document, Contract, and StorageConnection aggregates
+    for uploading/importing a version -- cross-aggregate coordination
     belongs in the application layer, not in any single aggregate's domain
-    methods.
+    methods. Contract lifecycle/workflow concerns live in ContractService.
     """
 
     def __init__(self, uow_factory: Callable[[], UnitOfWork], storage_service: StorageService) -> None:
         self._uow_factory = uow_factory
         self._storage_service = storage_service
-
-    async def create_document(
-        self,
-        organization_id: int,
-        title: str,
-        document_type: str,
-        workflow_definition_id: int,
-        actor: str,
-        description: str | None = None,
-    ) -> Document:
-        async with self._uow_factory() as uow:
-            definition = await uow.workflow_definitions.get(workflow_definition_id)
-            if definition is None:
-                raise NotFoundError(f"workflow definition {workflow_definition_id} not found")
-            document = Document.create(organization_id, title, document_type, description)
-            await uow.documents.add(document)
-            instance = WorkflowInstance.start(document.id, definition, actor)
-            await uow.workflow_instances.add(instance)
-            await uow.commit()
-            return document
 
     async def get(self, document_id: int) -> Document:
         async with self._uow_factory() as uow:
@@ -57,40 +34,27 @@ class DocumentService:
                 raise NotFoundError(f"document {document_id} not found")
             return document
 
-    async def list_for_organization(self, organization_id: int) -> list[Document]:
+    async def list_for_contract(self, contract_id: int) -> list[Document]:
         async with self._uow_factory() as uow:
-            return await uow.documents.list_for_organization(organization_id)
+            return await uow.documents.list_for_contract(contract_id)
 
-    async def get_instance(self, document_id: int) -> WorkflowInstance:
+    async def set_summary(self, document_id: int, summary: str) -> Document:
         async with self._uow_factory() as uow:
-            instance = await uow.workflow_instances.get_for_document(document_id)
-            if instance is None:
-                raise NotFoundError(f"no workflow instance for document {document_id}")
-            return instance
-
-    async def available_actions(self, document_id: int) -> list[WorkflowTransition]:
-        async with self._uow_factory() as uow:
-            instance = await uow.workflow_instances.get_for_document(document_id)
-            if instance is None:
-                raise NotFoundError(f"no workflow instance for document {document_id}")
-            definition = await uow.workflow_definitions.get(instance.workflow_definition_id)
-            if definition is None:
-                raise NotFoundError(f"workflow definition {instance.workflow_definition_id} not found")
-            return instance.available_actions(definition)
-
-    async def transition_document(
-        self, document_id: int, action_name: str, actor: str, comment: str | None = None
-    ) -> WorkflowInstance:
-        async with self._uow_factory() as uow:
-            instance = await uow.workflow_instances.get_for_document(document_id)
-            if instance is None:
-                raise NotFoundError(f"no workflow instance for document {document_id}")
-            definition = await uow.workflow_definitions.get(instance.workflow_definition_id)
-            if definition is None:
-                raise NotFoundError(f"workflow definition {instance.workflow_definition_id} not found")
-            instance.apply_transition(definition, action_name, actor, comment)
+            document = await uow.documents.get(document_id)
+            if document is None:
+                raise NotFoundError(f"document {document_id} not found")
+            document.set_summary(summary)
             await uow.commit()
-            return instance
+            return document
+
+    async def download_version(self, version: DocumentVersion) -> bytes:
+        async with self._uow_factory() as uow:
+            connection = await uow.storage_connections.get(version.storage_connection_id)
+            if connection is None:
+                raise NotFoundError(f"storage connection {version.storage_connection_id} not found")
+            secrets = connection.credential.secrets if connection.credential else {}
+            adapter = build_file_storage(connection, secrets)
+            return await adapter.download(version.storage_key)
 
     async def upload_version(
         self,
@@ -107,12 +71,18 @@ class DocumentService:
             document = await uow.documents.get(document_id)
             if document is None:
                 raise NotFoundError(f"document {document_id} not found")
-            connection = await uow.storage_connections.get_primary_for_organization(document.organization_id)
+            contract = await uow.contracts.get(document.contract_id)
+            if contract is None:
+                raise NotFoundError(f"contract {document.contract_id} not found")
+            connection = await uow.storage_connections.get_primary_for_organization(contract.organization_id)
             if connection is None:
-                raise NoPrimaryStorageConnectionError(document.organization_id)
+                raise NoPrimaryStorageConnectionError(contract.organization_id)
 
             next_version_no = document.current_version_no + 1
-            storage_key = f"org-{document.organization_id}/doc-{document.id}/v{next_version_no}-{_safe_filename(filename)}"
+            storage_key = (
+                f"org-{contract.organization_id}/contract-{contract.id}/doc-{document.id}"
+                f"/v{next_version_no}-{_safe_filename(filename)}"
+            )
             secrets = connection.credential.secrets if connection.credential else {}
             adapter = build_file_storage(connection, secrets)
             await adapter.upload(storage_key, file_bytes, content_type)

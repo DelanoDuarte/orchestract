@@ -101,12 +101,16 @@ class WorkflowDefinitionOut(BaseModel):
     transitions: list[WorkflowTransitionOut]
 
 
-class DocumentCreate(BaseModel):
+class ContractCreate(BaseModel):
     title: str
-    document_type: str
+    contract_type: str
     workflow_definition_id: int
     actor: str
     description: str | None = None
+
+
+class DocumentCreate(BaseModel):
+    name: str
 
 
 class DocumentVersionImport(BaseModel):
@@ -136,14 +140,29 @@ class DocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    organization_id: int
-    title: str
-    description: str | None
-    document_type: str
+    contract_id: int
+    name: str
     current_version_no: int
+    summary: str | None
+    summary_generated_at: datetime | None
     created_at: datetime
     updated_at: datetime
     versions: list[DocumentVersionOut]
+
+
+class ContractOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    organization_id: int
+    title: str
+    description: str | None
+    contract_type: str
+    summary: str | None
+    summary_generated_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    documents: list[DocumentOut]
 
 
 class TransitionExecute(BaseModel):
@@ -168,7 +187,7 @@ class WorkflowInstanceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    document_id: int
+    contract_id: int
     workflow_definition_id: int
     current_step_key: str
     status: InstanceStatus

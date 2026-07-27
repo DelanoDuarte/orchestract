@@ -1,6 +1,6 @@
 import pytest
 
-from app.domain.documents.exceptions import EmptyDocumentTitleError
+from app.domain.documents.exceptions import EmptyDocumentNameError
 from app.domain.documents.models import Document
 from app.domain.workflow.exceptions import (
     AmbiguousTransitionError,
@@ -107,13 +107,13 @@ def test_activate_succeeds_and_locks_further_edits():
 def test_instance_cannot_start_on_inactive_definition():
     definition = build_linear_definition()
     with pytest.raises(InactiveWorkflowError):
-        WorkflowInstance.start(document_id=1, definition=definition, actor="alice")
+        WorkflowInstance.start(contract_id=1, definition=definition, actor="alice")
 
 
 def test_instance_lifecycle_transitions_and_completes():
     definition = build_linear_definition()
     definition.activate()
-    instance = WorkflowInstance.start(document_id=1, definition=definition, actor="alice")
+    instance = WorkflowInstance.start(contract_id=1, definition=definition, actor="alice")
     assert instance.current_step_key == "draft"
     assert len(instance.history) == 1
 
@@ -132,13 +132,13 @@ def test_instance_lifecycle_transitions_and_completes():
         instance.apply_transition(definition, "approve", actor="carol")
 
 
-def test_document_requires_non_empty_title():
-    with pytest.raises(EmptyDocumentTitleError):
-        Document.create(organization_id=1, title="   ", document_type="NDA")
+def test_document_requires_non_empty_name():
+    with pytest.raises(EmptyDocumentNameError):
+        Document.create(name="   ")
 
 
 def test_document_add_version_increments_version_number():
-    document = Document.create(organization_id=1, title="MSA", document_type="MSA")
+    document = Document.create(name="MSA")
     assert document.current_version_no == 0
     v1 = document.add_version(
         storage_connection_id=1,

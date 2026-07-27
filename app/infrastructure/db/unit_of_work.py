@@ -3,6 +3,7 @@ from types import TracebackType
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.infrastructure.db.repositories.agents import SqlAlchemyAgentRepository
+from app.infrastructure.db.repositories.contracts import SqlAlchemyContractRepository
 from app.infrastructure.db.repositories.documents import SqlAlchemyDocumentRepository
 from app.infrastructure.db.repositories.organizations import SqlAlchemyOrganizationRepository
 from app.infrastructure.db.repositories.roles import SqlAlchemyRoleRepository
@@ -27,6 +28,7 @@ class UnitOfWork:
     agents: SqlAlchemyAgentRepository
     workflow_definitions: SqlAlchemyWorkflowDefinitionRepository
     workflow_instances: SqlAlchemyWorkflowInstanceRepository
+    contracts: SqlAlchemyContractRepository
     documents: SqlAlchemyDocumentRepository
     storage_connections: SqlAlchemyStorageConnectionRepository
     roles: SqlAlchemyRoleRepository
@@ -42,6 +44,7 @@ class UnitOfWork:
         self.agents = SqlAlchemyAgentRepository(self.session)
         self.workflow_definitions = SqlAlchemyWorkflowDefinitionRepository(self.session)
         self.workflow_instances = SqlAlchemyWorkflowInstanceRepository(self.session)
+        self.contracts = SqlAlchemyContractRepository(self.session)
         self.documents = SqlAlchemyDocumentRepository(self.session)
         self.storage_connections = SqlAlchemyStorageConnectionRepository(self.session)
         self.roles = SqlAlchemyRoleRepository(self.session)

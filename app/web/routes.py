@@ -2,13 +2,14 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.api.deps import (
     SESSION_COOKIE_NAME,
     agent_service,
     ai_service,
+    billing_service,
     contract_service,
     current_role_for_template,
     current_user_dep,
@@ -17,6 +18,7 @@ from app.api.deps import (
     enforce_login_and_membership,
     get_current_organization_from_path,
     organization_service,
+    registration_service,
     role_service,
     storage_service,
     user_service,
@@ -24,13 +26,22 @@ from app.api.deps import (
 )
 from app.application.permissions import assert_can_edit_contract_step
 from app.config import get_settings
-from app.domain.shared.exceptions import DomainError
+from app.domain.shared.exceptions import DomainError, NotFoundError
 from app.domain.storage.models import StorageProvider
 from app.domain.tenancy.models import Organization
-from app.domain.users.exceptions import InvalidCredentialsError, PermissionDeniedError
+from app.domain.tenancy.plans import PLAN_LIMITS, Plan
+from app.domain.users.exceptions import (
+    EmailNotVerifiedError,
+    InvalidCredentialsError,
+    InvalidOrExpiredTokenError,
+    PermissionDeniedError,
+)
 from app.domain.users.models import User
 from app.domain.workflow.models import WorkflowDefinition, WorkflowStatus
 from app.infrastructure.ai.client import ai_enabled
+from app.infrastructure.billing.stripe_client import InvalidWebhookEventError, billing_enabled, construct_webhook_event
+from app.infrastructure.email.client import send_email
+from app.infrastructure.email.templates import password_reset_email_html, verification_email_html
 from app.web.icons import icon, step_icon_name
 
 OAUTH_PROVIDER_LABELS = {StorageProvider.GOOGLE_DRIVE: "Google Drive", StorageProvider.ONEDRIVE: "OneDrive"}
@@ -92,8 +103,19 @@ async def _assert_can_edit_current_step(contract_id: int, current_user: User) ->
 
 @root_router.get("/")
 async def index(request: Request):
-    organizations = await organization_service.list_organizations()
-    return templates.TemplateResponse(request, "index.html", {"organizations": organizations})
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    user = await user_service.get_user_by_session_token(token) if token else None
+    if user is not None:
+        organization = await organization_service.get(user.organization_id)
+        return RedirectResponse(f"/{organization.slug}/", status_code=303)
+    return templates.TemplateResponse(request, "homepage.html", {"full_width": True})
+
+
+@root_router.get("/pricing")
+async def pricing_page(request: Request):
+    return templates.TemplateResponse(
+        request, "pricing.html", {"full_width": True, "plan_limits": PLAN_LIMITS}
+    )
 
 
 @root_router.get("/oauth/{provider}/callback")
@@ -116,6 +138,13 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
         return templates.TemplateResponse(
             request, "login.html", {"next": next, "error": str(exc)}, status_code=422
         )
+    except EmailNotVerifiedError as exc:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"next": next, "error": str(exc), "unverified_email": email},
+            status_code=422,
+        )
     session = await user_service.create_session(user.id)
     organization = await organization_service.get(user.organization_id)
     redirect_to = next if next.startswith(f"/{organization.slug}/") else f"/{organization.slug}/"
@@ -134,6 +163,167 @@ async def logout(request: Request):
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response
+
+
+def _session_response(redirect_to: str, session_token: str) -> RedirectResponse:
+    response = RedirectResponse(redirect_to, status_code=303)
+    response.set_cookie(
+        SESSION_COOKIE_NAME, session_token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 14
+    )
+    return response
+
+
+@root_router.get("/signup")
+async def signup_page(request: Request, plan: str = ""):
+    return templates.TemplateResponse(request, "signup.html", {"plan": plan})
+
+
+@root_router.post("/signup")
+async def signup_submit(
+    request: Request,
+    organization_name: str = Form(...),
+    user_name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    plan: str = Form(""),
+):
+    try:
+        organization, user, token = await registration_service.register(
+            organization_name, user_name, email, password
+        )
+    except DomainError as exc:
+        return templates.TemplateResponse(
+            request,
+            "signup.html",
+            {
+                "error": str(exc),
+                "organization_name": organization_name,
+                "user_name": user_name,
+                "email": email,
+                "plan": plan,
+            },
+            status_code=422,
+        )
+    link = f"{get_settings().app_base_url}/verify-email?token={token.token}"
+    if plan in ("team", "business"):
+        link += f"&plan={plan}"
+    send_email(user.email, "Verify your email", verification_email_html(link))
+    return templates.TemplateResponse(
+        request,
+        "auth_notice.html",
+        {
+            "heading": "Check your email",
+            "message": f"We've sent a verification link to {user.email}. Click it to activate your account.",
+            "is_error": False,
+        },
+    )
+
+
+@root_router.get("/verify-email")
+async def verify_email(request: Request, token: str, plan: str = ""):
+    try:
+        user = await user_service.verify_email(token)
+    except InvalidOrExpiredTokenError as exc:
+        return templates.TemplateResponse(
+            request,
+            "auth_notice.html",
+            {
+                "heading": "Link invalid",
+                "message": str(exc),
+                "is_error": True,
+                "action_href": "/login",
+                "action_label": "Back to sign in",
+            },
+            status_code=422,
+        )
+    session = await user_service.create_session(user.id)
+    organization = await organization_service.get(user.organization_id)
+    redirect_to = (
+        f"/{organization.slug}/settings/billing?plan={plan}"
+        if plan in ("team", "business")
+        else f"/{organization.slug}/"
+    )
+    return _session_response(redirect_to, session.token)
+
+
+@root_router.post("/verify-email/resend")
+async def resend_verification(request: Request, email: str = Form(...)):
+    result = await user_service.resend_verification(email)
+    if result is not None:
+        user, token = result
+        link = f"{get_settings().app_base_url}/verify-email?token={token.token}"
+        send_email(user.email, "Verify your email", verification_email_html(link))
+    return templates.TemplateResponse(
+        request,
+        "auth_notice.html",
+        {
+            "heading": "Check your email",
+            "message": f"If {email} has an unverified account, we've sent a new verification link.",
+            "is_error": False,
+        },
+    )
+
+
+@root_router.get("/forgot-password")
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse(request, "forgot_password.html", {})
+
+
+@root_router.post("/forgot-password")
+async def forgot_password_submit(request: Request, email: str = Form(...)):
+    result = await user_service.create_password_reset_token(email)
+    if result is not None:
+        user, token = result
+        link = f"{get_settings().app_base_url}/reset-password?token={token.token}"
+        send_email(user.email, "Reset your password", password_reset_email_html(link))
+    return templates.TemplateResponse(
+        request,
+        "auth_notice.html",
+        {
+            "heading": "Check your email",
+            "message": f"If {email} has an account, we've sent a password reset link.",
+            "is_error": False,
+        },
+    )
+
+
+@root_router.get("/reset-password")
+async def reset_password_page(request: Request, token: str):
+    return templates.TemplateResponse(request, "reset_password.html", {"token": token})
+
+
+@root_router.post("/reset-password")
+async def reset_password_submit(request: Request, token: str, new_password: str = Form(...)):
+    try:
+        user = await user_service.reset_password(token, new_password)
+    except InvalidOrExpiredTokenError as exc:
+        return templates.TemplateResponse(
+            request,
+            "auth_notice.html",
+            {
+                "heading": "Link invalid",
+                "message": str(exc),
+                "is_error": True,
+                "action_href": "/forgot-password",
+                "action_label": "Request a new link",
+            },
+            status_code=422,
+        )
+    session = await user_service.create_session(user.id)
+    organization = await organization_service.get(user.organization_id)
+    return _session_response(f"/{organization.slug}/", session.token)
+
+
+@root_router.post("/webhooks/stripe")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+    try:
+        event = construct_webhook_event(payload, sig_header)
+    except InvalidWebhookEventError:
+        return JSONResponse(status_code=400, content={"detail": "invalid signature"})
+    await billing_service.handle_webhook_event(event)
+    return JSONResponse(status_code=200, content={"received": True})
 
 
 @org_router.get("/")
@@ -421,6 +611,62 @@ async def toggle_user(
     return await users_page(request, organization)
 
 
+async def _account_context(organization: Organization, current_user: User) -> dict:
+    role = await role_service.get(current_user.role_id) if current_user.role_id else None
+    return {
+        "organization": organization,
+        "current_user_obj": current_user,
+        "current_role_obj": role,
+    }
+
+
+@org_router.get("/account")
+async def account_page(
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    context = await _account_context(organization, current_user)
+    return templates.TemplateResponse(request, "account.html", context)
+
+
+@org_router.post("/account")
+async def update_account(
+    request: Request,
+    name: str = Form(...),
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    try:
+        await user_service.rename(current_user.id, name)
+    except DomainError as exc:
+        context = await _account_context(organization, current_user)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "account.html", context, status_code=422)
+    context = await _account_context(organization, await user_service.get(current_user.id))
+    context["success"] = "Name updated."
+    return templates.TemplateResponse(request, "account.html", context)
+
+
+@org_router.post("/account/password")
+async def update_password(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    try:
+        await user_service.change_password(current_user.id, current_password, new_password)
+    except DomainError as exc:
+        context = await _account_context(organization, current_user)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "account.html", context, status_code=422)
+    context = await _account_context(organization, current_user)
+    context["success"] = "Password updated."
+    return templates.TemplateResponse(request, "account.html", context)
+
+
 async def _storage_settings_context(organization: Organization) -> dict:
     connections = await storage_service.list_connections(organization.id)
     return {
@@ -513,6 +759,71 @@ async def disconnect_connection(
 ):
     await storage_service.disconnect(connection_id)
     return await storage_settings_page(request, organization)
+
+
+async def _billing_settings_context(organization: Organization) -> dict:
+    limits = PLAN_LIMITS[Plan(organization.plan)]
+    user_count = len(await user_service.list_users(organization.id))
+    contract_count = len(await contract_service.list_for_organization(organization.id))
+    return {
+        "organization": organization,
+        "billing_enabled": billing_enabled(),
+        "plan_limits": PLAN_LIMITS,
+        "current_plan": Plan(organization.plan),
+        "current_limits": limits,
+        "user_count": user_count,
+        "contract_count": contract_count,
+        "active_nav": "billing",
+    }
+
+
+@org_router.get("/settings/billing")
+async def billing_settings_page(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path), plan: str = ""
+):
+    context = await _billing_settings_context(organization)
+    context["preselected_plan"] = plan
+    return templates.TemplateResponse(request, "billing_settings.html", context)
+
+
+@org_router.post("/settings/billing/checkout")
+async def start_checkout(
+    request: Request,
+    plan: str = Form(...),
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    settings = get_settings()
+    price_id = settings.stripe_price_team if plan == "team" else settings.stripe_price_business
+    if not billing_enabled() or not price_id:
+        context = await _billing_settings_context(organization)
+        context["error"] = "Billing is not configured yet."
+        return templates.TemplateResponse(request, "billing_settings.html", context, status_code=422)
+    base_url = f"{settings.app_base_url}/{organization.slug}/settings/billing"
+    checkout_url = await billing_service.start_checkout(
+        organization.id,
+        Plan(plan),
+        price_id,
+        success_url=f"{base_url}?checkout=success",
+        cancel_url=f"{base_url}?checkout=cancelled",
+        user_email=current_user.email,
+    )
+    return RedirectResponse(checkout_url, status_code=303)
+
+
+@org_router.post("/settings/billing/portal")
+async def start_portal(
+    request: Request, organization: Organization = Depends(get_current_organization_from_path)
+):
+    settings = get_settings()
+    return_url = f"{settings.app_base_url}/{organization.slug}/settings/billing"
+    try:
+        portal_url = await billing_service.start_portal_session(organization.id, return_url)
+    except NotFoundError as exc:
+        context = await _billing_settings_context(organization)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "billing_settings.html", context, status_code=422)
+    return RedirectResponse(portal_url, status_code=303)
 
 
 @org_router.get("/workflows")
@@ -750,7 +1061,7 @@ async def _contract_detail_context(organization: Organization, contract_id: int,
         "total_versions": total_versions,
         "can_edit": can_edit,
         "edit_role_names": [role.name for role in edit_roles],
-        "ai_enabled": ai_enabled(),
+        "ai_enabled": ai_enabled() and PLAN_LIMITS[Plan(organization.plan)].ai_enabled,
         "active_nav": "contracts",
     }
 
@@ -893,7 +1204,7 @@ async def summarize_contract(
     current_user: User = Depends(current_user_dep),
 ):
     try:
-        await ai_service.summarize_contract(contract_id)
+        await ai_service.summarize_contract(contract_id, organization)
     except DomainError as exc:
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
@@ -910,7 +1221,7 @@ async def summarize_document(
     current_user: User = Depends(current_user_dep),
 ):
     try:
-        await ai_service.summarize_document(document_id)
+        await ai_service.summarize_document(document_id, organization)
     except DomainError as exc:
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
@@ -929,7 +1240,9 @@ async def run_assistant(
     context = await _contract_detail_context(organization, contract_id, current_user)
     context["assistant_instruction"] = instruction
     try:
-        context["assistant_result"] = await ai_service.run_assistant(contract_id, instruction, current_user)
+        context["assistant_result"] = await ai_service.run_assistant(
+            contract_id, instruction, current_user, organization
+        )
     except DomainError as exc:
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)

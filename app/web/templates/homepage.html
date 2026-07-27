@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Orchestract -- Contract workflows, orchestrated{% endblock %}
+{% block content %}
+<div class="mx-auto flex max-w-5xl flex-col gap-20 py-8">
+  <section class="flex flex-col items-center gap-6 text-center">
+    <span class="badge" data-variant="secondary">Now with an AI contract assistant</span>
+    <h1 class="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
+      Contract workflows, fully orchestrated -- with AI that can run them for you.
+    </h1>
+    <p class="max-w-xl text-lg text-muted-foreground">
+      Define the steps a contract moves through, assign the agents and roles responsible for each,
+      and let Orchestract (and its AI assistant) keep everything moving and auditable.
+    </p>
+    <div class="flex flex-wrap items-center justify-center gap-3">
+      <a href="/signup" class="btn" data-size="lg">{{ icon('zap', 'size-4') }}<span>Get started free</span></a>
+      <a href="/pricing" class="btn" data-variant="outline" data-size="lg">See pricing</a>
+    </div>
+  </section>
+
+  <section class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="card" data-size="sm">
+      <section class="flex flex-col gap-2">
+        <span class="text-primary">{{ icon('git-branch', 'size-6') }}</span>
+        <h3 class="font-semibold">Workflow orchestration</h3>
+        <p class="text-sm text-muted-foreground">Model each contract's lifecycle as a graph of steps, owned by the agents responsible for them.</p>
+      </section>
+    </div>
+    <div class="card" data-size="sm">
+      <section class="flex flex-col gap-2">
+        <span class="text-primary">{{ icon('layers', 'size-6') }}</span>
+        <h3 class="font-semibold">Multi-document contracts</h3>
+        <p class="text-sm text-muted-foreground">A contract can own many documents -- exhibits, amendments, signature pages -- each with its own version history.</p>
+      </section>
+    </div>
+    <div class="card" data-size="sm">
+      <section class="flex flex-col gap-2">
+        <span class="text-primary">{{ icon('zap', 'size-6') }}</span>
+        <h3 class="font-semibold">AI summaries & assistant</h3>
+        <p class="text-sm text-muted-foreground">Summarize any document or contract on demand, or ask the AI assistant to drive a contract through its workflow for you.</p>
+      </section>
+    </div>
+    <div class="card" data-size="sm">
+      <section class="flex flex-col gap-2">
+        <span class="text-primary">{{ icon('shield', 'size-6') }}</span>
+        <h3 class="font-semibold">Role-based permissions</h3>
+        <p class="text-sm text-muted-foreground">Link roles to the agents that own each step -- only the right people (or an AI acting on their behalf) can act on it.</p>
+      </section>
+    </div>
+  </section>
+
+  <section class="flex flex-col items-center gap-4 rounded-lg border border-border py-12 text-center">
+    <h2 class="text-2xl font-semibold tracking-tight">Ready to orchestrate your contracts?</h2>
+    <p class="max-w-md text-muted-foreground">Free for small teams. No credit card required to start.</p>
+    <a href="/signup" class="btn" data-size="lg">Create your organization</a>
+  </section>
+</div>
+{% endblock %}

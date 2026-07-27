@@ -3,6 +3,8 @@ from collections.abc import Callable
 from app.domain.contracts.models import Contract
 from app.domain.documents.models import Document
 from app.domain.shared.exceptions import NotFoundError
+from app.domain.tenancy.exceptions import PlanLimitExceededError
+from app.domain.tenancy.plans import PLAN_LIMITS, Plan
 from app.domain.workflow.models import WorkflowTransition
 from app.domain.workflow_instances.models import WorkflowInstance
 from app.infrastructure.db.unit_of_work import UnitOfWork
@@ -30,6 +32,17 @@ class ContractService:
         description: str | None = None,
     ) -> Contract:
         async with self._uow_factory() as uow:
+            organization = await uow.organizations.get(organization_id)
+            if organization is None:
+                raise NotFoundError(f"organization {organization_id} not found")
+            limits = PLAN_LIMITS[Plan(organization.plan)]
+            if limits.max_contracts is not None:
+                existing_contracts = await uow.contracts.list_for_organization(organization_id)
+                if len(existing_contracts) >= limits.max_contracts:
+                    raise PlanLimitExceededError(
+                        f"the {limits.display_name} plan is limited to {limits.max_contracts} contracts -- "
+                        "upgrade to add more"
+                    )
             definition = await uow.workflow_definitions.get(workflow_definition_id)
             if definition is None:
                 raise NotFoundError(f"workflow definition {workflow_definition_id} not found")

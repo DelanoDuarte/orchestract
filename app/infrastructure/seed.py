@@ -20,6 +20,7 @@ from app.api.deps import (
 )
 from app.domain.shared.exceptions import NotFoundError
 from app.domain.storage.models import StorageProvider
+from app.domain.tenancy.plans import Plan
 
 ORG_NAME = "Acme Corp"
 
@@ -89,7 +90,8 @@ async def main() -> None:
         pass
 
     organization = await organization_service.create_organization(ORG_NAME)
-    print(f"Created organization: {organization.name} ({organization.slug})")
+    organization = await organization_service.set_plan(organization.id, Plan.BUSINESS)
+    print(f"Created organization: {organization.name} ({organization.slug}), plan: {organization.plan}")
 
     agents_by_name = {}
     for name, description in AGENT_NAMES:
@@ -106,7 +108,8 @@ async def main() -> None:
 
     print("Created users (email / password):")
     for name, email, password, role_name in USER_DEFINITIONS:
-        await user_service.create_user(organization.id, name, email, password, roles_by_name[role_name].id)
+        user = await user_service.create_user(organization.id, name, email, password, roles_by_name[role_name].id)
+        await user_service.force_verify(user.id)
         print(f"  {email} / {password}  ({role_name})")
 
     definition = await workflow_service.create_definition(

@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from app.domain.shared.exceptions import NotFoundError
 from app.domain.tenancy.models import Organization
+from app.domain.tenancy.plans import Plan
 from app.infrastructure.db.unit_of_work import UnitOfWork
 
 
@@ -32,4 +33,13 @@ class OrganizationService:
             organization = await uow.organizations.get_by_slug(slug)
             if organization is None:
                 raise NotFoundError(f"organization '{slug}' not found")
+            return organization
+
+    async def set_plan(self, organization_id: int, plan: Plan) -> Organization:
+        async with self._uow_factory() as uow:
+            organization = await uow.organizations.get(organization_id)
+            if organization is None:
+                raise NotFoundError(f"organization {organization_id} not found")
+            organization.set_plan(plan)
+            await uow.commit()
             return organization

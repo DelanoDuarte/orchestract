@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Pricing{% endblock %}
+{% block content %}
+<div class="mx-auto flex max-w-5xl flex-col gap-10 py-8">
+  <div class="flex flex-col items-center gap-3 text-center">
+    <h1 class="text-4xl font-semibold tracking-tight">Simple, transparent pricing</h1>
+    <p class="max-w-lg text-muted-foreground">Start free. Upgrade when your team and contract volume grow.</p>
+  </div>
+
+  <div class="grid gap-6 md:grid-cols-3">
+    {% for plan, limits in plan_limits.items() %}
+    <div class="card" data-size="sm">
+      <header>
+        <h2 class="text-lg">{{ limits.display_name }}</h2>
+        <p class="text-2xl font-semibold text-foreground">
+          ${{ limits.monthly_price_usd }}<span class="text-sm font-normal text-muted-foreground">/mo</span>
+        </p>
+      </header>
+      <section class="flex flex-col gap-4">
+        <ul class="flex flex-col gap-2 text-sm text-muted-foreground">
+          <li class="flex items-center gap-2">{{ icon('check', 'size-4 text-primary') }}{{ limits.max_users or "Unlimited" }} users</li>
+          <li class="flex items-center gap-2">{{ icon('check', 'size-4 text-primary') }}{{ limits.max_contracts or "Unlimited" }} contracts</li>
+          <li class="flex items-center gap-2">{{ icon('check', 'size-4 text-primary') }}{{ "AI summaries & assistant" if limits.ai_enabled else "No AI features" }}</li>
+        </ul>
+        <a href="/signup{{ '?plan=' + plan.value if plan.value != 'free' else '' }}" class="btn w-full">
+          {{ "Get started free" if plan.value == "free" else "Sign up" }}
+        </a>
+      </section>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

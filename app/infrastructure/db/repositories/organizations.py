@@ -19,6 +19,12 @@ class SqlAlchemyOrganizationRepository:
         result = await self._session.execute(select(Organization).where(Organization.slug == slug))
         return result.scalar_one_or_none()
 
+    async def get_by_stripe_customer_id(self, customer_id: str) -> Organization | None:
+        result = await self._session.execute(
+            select(Organization).where(Organization.stripe_customer_id == customer_id)
+        )
+        return result.scalar_one_or_none()
+
     async def list(self) -> list[Organization]:
         result = await self._session.execute(select(Organization).order_by(Organization.name))
         return list(result.scalars().all())

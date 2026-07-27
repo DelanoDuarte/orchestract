@@ -31,6 +31,16 @@ class InvalidCredentialsError(DomainError):
         super().__init__("incorrect email or password")
 
 
+class EmailNotVerifiedError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("this account's email address has not been verified yet")
+
+
+class InvalidOrExpiredTokenError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("this link is invalid or has expired")
+
+
 class PermissionDeniedError(DomainError):
     def __init__(self, message: str = "you do not have permission to perform this action") -> None:
         super().__init__(message)

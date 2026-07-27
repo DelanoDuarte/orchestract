@@ -35,6 +35,19 @@ class Settings(BaseSettings):
     microsoft_oauth_client_id: str = ""
     microsoft_oauth_client_secret: str = ""
 
+    # Transactional email (Resend). Empty by default -- send_email() logs the
+    # message instead of sending it until this is configured.
+    resend_api_key: str = ""
+    email_from_address: str = "Orchestract <onboarding@resend.dev>"
+    app_base_url: str = "http://127.0.0.1:8000"
+
+    # Stripe (test mode). Empty by default -- billing pages render a "not
+    # configured" state until an administrator sets these.
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_team: str = ""
+    stripe_price_business: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

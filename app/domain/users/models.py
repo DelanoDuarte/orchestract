@@ -1,7 +1,8 @@
+import enum
 import secrets
 from datetime import datetime, timedelta
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.shared.base import Base
@@ -10,6 +11,8 @@ from app.domain.shared.types import slugify, utcnow
 from app.domain.users.exceptions import EmptyRoleNameError, EmptyUserEmailError, EmptyUserNameError
 
 _SESSION_TTL = timedelta(days=14)
+EMAIL_VERIFICATION_TTL = timedelta(hours=24)
+PASSWORD_RESET_TTL = timedelta(hours=1)
 
 
 class Role(Base):
@@ -76,6 +79,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(300))
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     @classmethod
@@ -118,6 +122,13 @@ class User(Base):
     def activate(self) -> None:
         self.is_active = True
 
+    def mark_email_verified(self) -> None:
+        self.email_verified_at = utcnow()
+
+    @property
+    def is_email_verified(self) -> bool:
+        return self.email_verified_at is not None
+
 
 class UserSession(Base):
     """An opaque, DB-backed login session. The cookie only ever holds
@@ -136,6 +147,41 @@ class UserSession(Base):
     @classmethod
     def issue(cls, user_id: int, ttl: timedelta = _SESSION_TTL) -> "UserSession":
         return cls(user_id=user_id, token=secrets.token_urlsafe(32), expires_at=utcnow() + ttl)
+
+    def is_valid(self) -> bool:
+        return utcnow() < self.expires_at
+
+
+class UserTokenPurpose(str, enum.Enum):
+    EMAIL_VERIFICATION = "email_verification"
+    PASSWORD_RESET = "password_reset"
+
+
+class UserToken(Base):
+    """A single-use, DB-backed token for out-of-band flows (email
+    verification, password reset) -- mirrors `UserSession`'s shape, but
+    scoped to a `purpose` and always deleted after use rather than left to
+    expire naturally.
+    """
+
+    __tablename__ = "user_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    purpose: Mapped[UserTokenPurpose] = mapped_column(Enum(UserTokenPurpose))
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column()
+
+    @classmethod
+    def issue(cls, user_id: int, purpose: UserTokenPurpose) -> "UserToken":
+        ttl = EMAIL_VERIFICATION_TTL if purpose is UserTokenPurpose.EMAIL_VERIFICATION else PASSWORD_RESET_TTL
+        return cls(
+            user_id=user_id,
+            purpose=purpose,
+            token=secrets.token_urlsafe(32),
+            expires_at=utcnow() + ttl,
+        )
 
     def is_valid(self) -> bool:
         return utcnow() < self.expires_at

@@ -9,6 +9,7 @@ from app.infrastructure.db.repositories.organizations import SqlAlchemyOrganizat
 from app.infrastructure.db.repositories.roles import SqlAlchemyRoleRepository
 from app.infrastructure.db.repositories.storage_connections import SqlAlchemyStorageConnectionRepository
 from app.infrastructure.db.repositories.user_sessions import SqlAlchemyUserSessionRepository
+from app.infrastructure.db.repositories.user_tokens import SqlAlchemyUserTokenRepository
 from app.infrastructure.db.repositories.users import SqlAlchemyUserRepository
 from app.infrastructure.db.repositories.workflow_definitions import SqlAlchemyWorkflowDefinitionRepository
 from app.infrastructure.db.repositories.workflow_instances import SqlAlchemyWorkflowInstanceRepository
@@ -34,6 +35,7 @@ class UnitOfWork:
     roles: SqlAlchemyRoleRepository
     users: SqlAlchemyUserRepository
     user_sessions: SqlAlchemyUserSessionRepository
+    user_tokens: SqlAlchemyUserTokenRepository
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._session_factory = session_factory
@@ -50,6 +52,7 @@ class UnitOfWork:
         self.roles = SqlAlchemyRoleRepository(self.session)
         self.users = SqlAlchemyUserRepository(self.session)
         self.user_sessions = SqlAlchemyUserSessionRepository(self.session)
+        self.user_tokens = SqlAlchemyUserTokenRepository(self.session)
         return self
 
     async def __aexit__(

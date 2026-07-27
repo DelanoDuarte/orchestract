@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from app.domain.users.models import Role, User, UserSession
+from app.domain.users.models import Role, User, UserSession, UserToken, UserTokenPurpose
 
 
 class RoleRepository(Protocol):
@@ -31,3 +31,13 @@ class UserSessionRepository(Protocol):
     async def get_by_token(self, token: str) -> UserSession | None: ...
 
     async def delete(self, token: str) -> None: ...
+
+
+class UserTokenRepository(Protocol):
+    async def add(self, token: UserToken) -> None: ...
+
+    async def get_by_token(self, token: str, purpose: UserTokenPurpose) -> UserToken | None: ...
+
+    async def delete(self, token: str) -> None: ...
+
+    async def delete_for_user(self, user_id: int, purpose: UserTokenPurpose) -> None: ...

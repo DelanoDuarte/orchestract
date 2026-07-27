@@ -10,6 +10,8 @@ from app.domain.ai.exceptions import AIUnavailableError, NoVersionsError, Unsupp
 from app.domain.contracts.models import Contract
 from app.domain.documents.models import Document
 from app.domain.shared.exceptions import DomainError
+from app.domain.tenancy.models import Organization
+from app.domain.tenancy.plans import PLAN_LIMITS, Plan
 from app.domain.users.models import User
 from app.infrastructure.ai.client import AI_MODEL, ai_enabled, get_anthropic_client
 
@@ -48,8 +50,8 @@ class AIService:
         self._role_service = role_service
         self._workflow_service = workflow_service
 
-    def _require_enabled(self) -> None:
-        if not ai_enabled():
+    def _require_enabled(self, organization: Organization) -> None:
+        if not ai_enabled() or not PLAN_LIMITS[Plan(organization.plan)].ai_enabled:
             raise AIUnavailableError()
 
     async def _complete(self, prompt: str) -> str:
@@ -61,8 +63,8 @@ class AIService:
         )
         return next((block.text for block in response.content if block.type == "text"), "").strip()
 
-    async def summarize_document(self, document_id: int) -> Document:
-        self._require_enabled()
+    async def summarize_document(self, document_id: int, organization: Organization) -> Document:
+        self._require_enabled(organization)
         document = await self._document_service.get(document_id)
         version = document.latest_version()
         if version is None:
@@ -77,8 +79,8 @@ class AIService:
         )
         return await self._document_service.set_summary(document_id, summary)
 
-    async def summarize_contract(self, contract_id: int) -> Contract:
-        self._require_enabled()
+    async def summarize_contract(self, contract_id: int, organization: Organization) -> Contract:
+        self._require_enabled(organization)
         contract = await self._contract_service.get(contract_id)
         instance = await self._contract_service.get_instance(contract_id)
         sections = [
@@ -101,8 +103,10 @@ class AIService:
         )
         return await self._contract_service.set_summary(contract_id, summary)
 
-    async def run_assistant(self, contract_id: int, instruction: str, current_user: User) -> dict:
-        self._require_enabled()
+    async def run_assistant(
+        self, contract_id: int, instruction: str, current_user: User, organization: Organization
+    ) -> dict:
+        self._require_enabled(organization)
         client = get_anthropic_client()
         actor = f"AI Assistant (on behalf of {current_user.name})"
 

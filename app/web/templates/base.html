@@ -91,6 +91,11 @@
                 {{ icon('package') }}<span>Storage</span>
               </a>
             </li>
+            <li>
+              <a href="/{{ organization.slug }}/settings/billing" {% if active_nav == "billing" %}aria-current="page"{% endif %}>
+                {{ icon('credit-card') }}<span>Billing</span>
+              </a>
+            </li>
           </ul>
         </div>
       </section>
@@ -112,6 +117,11 @@
       </a>
       {% endif %}
       <div class="flex items-center gap-2">
+        {% if not organization %}
+        <a href="/pricing" class="btn" data-variant="ghost" data-size="sm">Pricing</a>
+        <a href="/login" class="btn" data-variant="ghost" data-size="sm">Log in</a>
+        <a href="/signup" class="btn" data-size="sm">Sign up</a>
+        {% endif %}
         {% if organization %}
         {% set me = current_user(request) %}
         {% set my_role = current_role(request) %}
@@ -120,8 +130,8 @@
           Signed in as <span class="font-medium text-foreground">{{ me.name }}</span>{% if my_role %} · {{ my_role.name }}{% endif %}
         </span>
         {% endif %}
-        <a href="/" class="btn" data-variant="ghost" data-size="sm">
-          {{ icon('building-2', 'size-4') }}<span>Switch organization</span>
+        <a href="/{{ organization.slug }}/account" class="btn" data-variant="ghost" data-size="sm">
+          {{ icon('settings', 'size-4') }}<span>Account</span>
         </a>
         <form method="post" action="/logout">
           <button type="submit" class="btn" data-variant="ghost" data-size="icon" aria-label="Log out">
@@ -136,7 +146,7 @@
         </button>
       </div>
     </header>
-    <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8 {{ "mx-auto w-full max-w-2xl" if not organization else "" }}">
+    <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8 {{ "mx-auto w-full max-w-2xl" if (not organization and not full_width) else "" }}">
       {% block content %}{% endblock %}
     </main>
   </div>

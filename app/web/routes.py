@@ -25,7 +25,9 @@ from app.api.deps import (
     workflow_service,
 )
 from app.application.permissions import assert_can_edit_contract_step
+from app.application.workflow_presets import PRESETS_BY_KEY, WORKFLOW_PRESETS, WorkflowPreset
 from app.config import get_settings
+from app.domain.shared.types import slugify
 from app.domain.shared.exceptions import DomainError, NotFoundError
 from app.domain.storage.models import StorageProvider
 from app.domain.tenancy.models import Organization
@@ -39,9 +41,16 @@ from app.domain.users.exceptions import (
 from app.domain.users.models import User
 from app.domain.workflow.models import WorkflowDefinition, WorkflowStatus
 from app.infrastructure.ai.client import ASSISTANT_TOOL_NAMES, SUPPORTED_AI_MODELS
-from app.infrastructure.billing.stripe_client import InvalidWebhookEventError, billing_enabled, construct_webhook_event
+from app.infrastructure.billing.stripe_client import (
+    InvalidWebhookEventError,
+    billing_enabled,
+    construct_webhook_event,
+)
 from app.infrastructure.email.client import send_email
-from app.infrastructure.email.templates import password_reset_email_html, verification_email_html
+from app.infrastructure.email.templates import (
+    password_reset_email_html,
+    verification_email_html,
+)
 from app.web.icons import icon, step_icon_name
 
 OAUTH_PROVIDER_LABELS = {StorageProvider.GOOGLE_DRIVE: "Google Drive", StorageProvider.ONEDRIVE: "OneDrive"}
@@ -516,6 +525,37 @@ async def toggle_agent(
     return await agents_page(request, organization)
 
 
+@org_router.post("/agents/quick")
+async def quick_create_agent(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    """Inline "quick create" used from the Workflow detail page: creates an
+    agent and returns just the "Owned by" <select> fragment with the new agent
+    selected, so the add-step form keeps whatever else was typed."""
+    quick_error = None
+    selected_agent_id = None
+    try:
+        agent = await agent_service.create_agent(organization.id, name, description or None)
+        selected_agent_id = agent.id
+    except DomainError as exc:
+        quick_error = str(exc)
+    agents = await agent_service.list_agents(organization.id)
+    return templates.TemplateResponse(
+        request,
+        "_step_agent_select_response.html",
+        {
+            "organization": organization,
+            "agents": agents,
+            "selected_agent_id": selected_agent_id,
+            "quick_error": quick_error,
+        },
+        status_code=422 if quick_error else 200,
+    )
+
+
 @org_router.get("/roles")
 async def roles_page(
     request: Request, organization: Organization = Depends(get_current_organization_from_path)
@@ -562,6 +602,40 @@ async def create_role(
             status_code=422,
         )
     return await roles_page(request, organization)
+
+
+@org_router.post("/roles/quick")
+async def quick_create_role(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    role_ids: list[int] = Form([]),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    """Inline "quick create" used from the New agent page: creates an unlinked
+    role and returns just the linked-roles checklist fragment (with the new
+    role pre-checked) so the surrounding agent form keeps its state. `role_ids`
+    carries the boxes already ticked so they survive the swap."""
+    quick_error = None
+    try:
+        role = await role_service.create_role(organization.id, name, description or None, None)
+        role_ids = [*role_ids, role.id]
+    except DomainError as exc:
+        quick_error = str(exc)
+    roles = await role_service.list_roles(organization.id)
+    agent_names = await _agent_names(organization.id)
+    return templates.TemplateResponse(
+        request,
+        "_agent_roles_field_response.html",
+        {
+            "organization": organization,
+            "roles": roles,
+            "agent_names": agent_names,
+            "selected_role_ids": role_ids,
+            "quick_error": quick_error,
+        },
+        status_code=422 if quick_error else 200,
+    )
 
 
 @org_router.get("/users")
@@ -857,8 +931,66 @@ async def new_workflow_page(
     return templates.TemplateResponse(
         request,
         "workflow_new.html",
-        {"organization": organization, "active_nav": "workflows"},
+        {"organization": organization, "presets": WORKFLOW_PRESETS, "active_nav": "workflows"},
     )
+
+
+async def _unique_workflow_name(organization_id: int, base_name: str) -> str:
+    existing_slugs = {wf.slug for wf in await workflow_service.list_for_organization(organization_id)}
+    if slugify(base_name) not in existing_slugs:
+        return base_name
+    suffix = 2
+    while slugify(f"{base_name} {suffix}") in existing_slugs:
+        suffix += 1
+    return f"{base_name} {suffix}"
+
+
+async def _create_workflow_from_preset(organization: Organization, preset: WorkflowPreset) -> WorkflowDefinition:
+    """Materializes a preset into a fresh DRAFT workflow: ensures each named
+    agent exists (reusing matches, creating the rest), then wires the steps and
+    transitions. Left as a draft so the user reviews and activates it."""
+    existing_agents = {agent.name: agent for agent in await agent_service.list_agents(organization.id)}
+    agent_ids: dict[str, int] = {}
+    for agent_name, agent_description in preset.agents:
+        agent = existing_agents.get(agent_name)
+        if agent is None:
+            agent = await agent_service.create_agent(organization.id, agent_name, agent_description)
+            existing_agents[agent_name] = agent
+        agent_ids[agent_name] = agent.id
+    name = await _unique_workflow_name(organization.id, preset.name)
+    definition = await workflow_service.create_definition(organization.id, name, preset.description)
+    for step in preset.steps:
+        await workflow_service.add_step(
+            definition.id, step.key, step.name, agent_ids[step.agent], step.description, step.is_initial, step.is_terminal
+        )
+    for transition in preset.transitions:
+        await workflow_service.add_transition(
+            definition.id, transition.from_key, transition.to_key, transition.action_name, transition.description
+        )
+    return definition
+
+
+@org_router.post("/workflows/from-preset")
+async def create_workflow_from_preset(
+    request: Request,
+    preset_key: str = Form(...),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    preset = PRESETS_BY_KEY.get(preset_key)
+    if preset is None:
+        return templates.TemplateResponse(
+            request,
+            "workflow_new.html",
+            {
+                "organization": organization,
+                "presets": WORKFLOW_PRESETS,
+                "active_nav": "workflows",
+                "error": "That example is no longer available.",
+            },
+            status_code=422,
+        )
+    definition = await _create_workflow_from_preset(organization, preset)
+    return RedirectResponse(f"/{organization.slug}/workflows/{definition.id}", status_code=303)
 
 
 @org_router.post("/workflows")
@@ -966,6 +1098,21 @@ async def activate_workflow(
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "workflow_detail.html", context, status_code=422)
     return await workflow_detail(definition_id, request, organization)
+
+
+@org_router.post("/workflows/{definition_id}/duplicate")
+async def duplicate_workflow(
+    definition_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        copy = await workflow_service.duplicate_definition(definition_id)
+    except DomainError as exc:
+        context = await _workflow_detail_context(organization, definition_id)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "workflow_detail.html", context, status_code=422)
+    return RedirectResponse(f"/{organization.slug}/workflows/{copy.id}", status_code=303)
 
 
 @org_router.get("/contracts")

@@ -1,0 +1,8 @@
+{# "Owned by" agent picker for the add-step form. Rendered inline on the
+   Workflow detail page and returned on its own by the /agents/quick htmx
+   endpoint, so it carries its own swap id. #}
+<select id="step-agent" name="agent_id" class="select w-full" required>
+  {% for agent in agents %}
+  <option value="{{ agent.id }}" {% if selected_agent_id and agent.id == selected_agent_id %}selected{% endif %}>{{ agent.name }}</option>
+  {% endfor %}
+</select>

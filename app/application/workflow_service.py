@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 from app.domain.shared.exceptions import NotFoundError
+from app.domain.shared.types import slugify
 from app.domain.workflow.models import WorkflowDefinition
 from app.domain.workflow.validation import find_validation_issues
 from app.infrastructure.db.unit_of_work import UnitOfWork
@@ -72,6 +73,43 @@ class WorkflowService:
             definition.activate()
             await uow.commit()
             return definition
+
+    @staticmethod
+    def _unique_copy_name(base_name: str, existing_slugs: set[str]) -> str:
+        candidate = f"{base_name} (copy)"
+        if slugify(candidate) not in existing_slugs:
+            return candidate
+        suffix = 2
+        while slugify(f"{base_name} (copy {suffix})") in existing_slugs:
+            suffix += 1
+        return f"{base_name} (copy {suffix})"
+
+    async def duplicate_definition(self, definition_id: int) -> WorkflowDefinition:
+        """Clones a workflow (steps + transitions) into a fresh DRAFT copy so
+        the user can edit its graph and activate it independently. The copy
+        gets a unique '<name> (copy)' name to satisfy the per-org slug
+        constraint."""
+        async with self._uow_factory() as uow:
+            source = await uow.workflow_definitions.get(definition_id)
+            if source is None:
+                raise NotFoundError(f"workflow definition {definition_id} not found")
+            existing = await uow.workflow_definitions.list_for_organization(source.organization_id)
+            copy = WorkflowDefinition.create(
+                source.organization_id,
+                self._unique_copy_name(source.name, {d.slug for d in existing}),
+                source.description,
+            )
+            for step in source.steps:
+                copy.add_step(
+                    step.key, step.name, step.agent_id, step.description, step.is_initial, step.is_terminal
+                )
+            for transition in source.transitions:
+                copy.add_transition(
+                    transition.from_step_key, transition.to_step_key, transition.action_name, transition.description
+                )
+            await uow.workflow_definitions.add(copy)
+            await uow.commit()
+            return copy
 
     async def get_validation_issues(self, definition_id: int) -> list[str]:
         async with self._uow_factory() as uow:

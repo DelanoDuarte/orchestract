@@ -5,14 +5,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.infrastructure.db.repositories.agents import SqlAlchemyAgentRepository
 from app.infrastructure.db.repositories.contracts import SqlAlchemyContractRepository
 from app.infrastructure.db.repositories.documents import SqlAlchemyDocumentRepository
-from app.infrastructure.db.repositories.organizations import SqlAlchemyOrganizationRepository
+from app.infrastructure.db.repositories.organizations import (
+    SqlAlchemyOrganizationRepository,
+)
 from app.infrastructure.db.repositories.roles import SqlAlchemyRoleRepository
-from app.infrastructure.db.repositories.storage_connections import SqlAlchemyStorageConnectionRepository
-from app.infrastructure.db.repositories.user_sessions import SqlAlchemyUserSessionRepository
+from app.infrastructure.db.repositories.storage_connections import (
+    SqlAlchemyStorageConnectionRepository,
+)
+from app.infrastructure.db.repositories.user_sessions import (
+    SqlAlchemyUserSessionRepository,
+)
 from app.infrastructure.db.repositories.user_tokens import SqlAlchemyUserTokenRepository
 from app.infrastructure.db.repositories.users import SqlAlchemyUserRepository
-from app.infrastructure.db.repositories.workflow_definitions import SqlAlchemyWorkflowDefinitionRepository
-from app.infrastructure.db.repositories.workflow_instances import SqlAlchemyWorkflowInstanceRepository
+from app.infrastructure.db.repositories.workflow_definitions import (
+    SqlAlchemyWorkflowDefinitionRepository,
+)
+from app.infrastructure.db.repositories.workflow_instances import (
+    SqlAlchemyWorkflowInstanceRepository,
+)
 
 
 class UnitOfWork:

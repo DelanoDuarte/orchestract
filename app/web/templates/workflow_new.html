@@ -27,8 +27,42 @@
         <label for="workflow-description">Description</label>
         <input id="workflow-description" type="text" name="description" placeholder="Optional">
       </div>
-      <button type="submit" class="btn w-full">Create</button>
+      <button type="submit" class="btn w-full">Create blank workflow</button>
     </form>
   </div>
+
+  {% if presets %}
+  <div class="mt-8">
+    <div class="mb-3 space-y-1">
+      <p class="eyebrow">Or start from an example</p>
+      <p class="text-sm text-muted-foreground">
+        Each example creates a ready-made draft — agents, steps and transitions already wired up. Use it to see how
+        workflows fit together, then edit the steps and transitions and activate it when you're happy.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+      {% for preset in presets %}
+      <form method="post" action="/{{ organization.slug }}/workflows/from-preset" class="card flex h-full flex-col gap-3 p-5">
+        <input type="hidden" name="preset_key" value="{{ preset.key }}">
+        <div class="flex items-start gap-3">
+          <span class="icon-chip">{{ icon(preset.icon, 'size-5') }}</span>
+          <div class="min-w-0 space-y-1">
+            <h2 class="section-title">{{ preset.name }}</h2>
+            <p class="text-sm text-muted-foreground">{{ preset.description }}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 text-xs text-muted-foreground">
+          <span class="inline-flex items-center gap-1">{{ icon('layers', 'size-3.5') }}{{ preset.steps|length }} steps</span>
+          <span class="inline-flex items-center gap-1">{{ icon('arrow-right', 'size-3.5') }}{{ preset.transitions|length }} transitions</span>
+          <span class="inline-flex items-center gap-1">{{ icon('users', 'size-3.5') }}{{ preset.agents|length }} agents</span>
+        </div>
+        <button type="submit" class="btn mt-auto self-start" data-variant="outline" data-size="sm">
+          {{ icon('plus', 'size-4') }}<span>Use this example</span>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

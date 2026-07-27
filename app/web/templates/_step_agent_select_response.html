@@ -1,0 +1,6 @@
+{# htmx response for POST /agents/quick: swaps the "Owned by" select into the
+   add-step form and, out-of-band, refreshes the dialog's error slot. #}
+{% include "_step_agent_select.html" %}
+<div id="agent-quick-error" hx-swap-oob="true">
+  {% if quick_error %}<p class="text-sm text-destructive">{{ quick_error }}</p>{% endif %}
+</div>

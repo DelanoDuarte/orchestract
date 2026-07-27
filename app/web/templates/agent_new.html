@@ -27,23 +27,49 @@
         <label for="agent-description">Description</label>
         <input id="agent-description" type="text" name="description" placeholder="Optional">
       </div>
-      {% if roles %}
       <div role="group" class="field">
-        <label>Linked roles</label>
-        <div class="flex flex-col gap-2 rounded-[var(--radius)] border border-border p-3">
-          {% for role in roles %}
-          <label class="flex items-center gap-2 text-sm font-normal">
-            <input type="checkbox" name="role_ids" value="{{ role.id }}">
-            {{ role.name }}
-            {% if role.agent_id %}<span class="text-xs text-muted-foreground">(currently on {{ agent_names.get(role.agent_id, "agent #" ~ role.agent_id) }})</span>{% endif %}
-          </label>
-          {% endfor %}
+        <div class="flex items-center justify-between gap-2">
+          <label>Linked roles</label>
+          <button type="button" class="btn" data-variant="ghost" data-size="sm" hx-boost="false"
+                  onclick="document.getElementById('role-quick-dialog').showModal()">
+            {{ icon('plus', 'size-4') }}<span>New role</span>
+          </button>
         </div>
+        {% include "_agent_roles_field.html" %}
         <p>Checked roles will be the only ones that can act on this agent's workflow steps.</p>
       </div>
-      {% endif %}
       <button type="submit" class="btn w-full">Create agent</button>
     </form>
   </div>
 </div>
+
+<dialog id="role-quick-dialog" class="dialog">
+  <article>
+    <header>
+      <h2 class="section-title">Quick create role</h2>
+      <p class="text-sm text-muted-foreground">Add a role without leaving this page. It'll be linked once you save the agent.</p>
+    </header>
+    <form hx-post="/{{ organization.slug }}/roles/quick"
+          hx-target="#agent-roles-field"
+          hx-select="unset"
+          hx-swap="outerHTML"
+          hx-include="[name='role_ids']"
+          hx-on::after-request="if(event.detail.successful){this.reset(); this.closest('dialog').close();}"
+          class="flex flex-col gap-4 py-2">
+      <div role="group" class="field">
+        <label for="quick-role-name">Name</label>
+        <input id="quick-role-name" type="text" name="name" required placeholder="e.g. Legal Lead">
+      </div>
+      <div role="group" class="field">
+        <label for="quick-role-description">Description</label>
+        <input id="quick-role-description" type="text" name="description" placeholder="Optional">
+      </div>
+      <div id="role-quick-error"></div>
+      <footer class="flex justify-end gap-2">
+        <button type="button" class="btn" data-variant="ghost" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="btn">{{ icon('plus', 'size-4') }}<span>Create role</span></button>
+      </footer>
+    </form>
+  </article>
+</dialog>
 {% endblock %}

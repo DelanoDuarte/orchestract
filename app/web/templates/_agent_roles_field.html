@@ -1,0 +1,15 @@
+{# Linked-roles checklist for the agent form. Rendered inline on the New agent
+   page and returned on its own by the /roles/quick htmx endpoint, so it carries
+   its own swap id. `selected_role_ids` marks which boxes stay checked. #}
+{% set selected_role_ids = selected_role_ids|default([]) %}
+<div id="agent-roles-field" class="flex flex-col gap-2 rounded-[var(--radius)] border border-border p-3">
+  {% for role in roles %}
+  <label class="flex items-center gap-2 text-sm font-normal">
+    <input type="checkbox" name="role_ids" value="{{ role.id }}" {% if role.id in selected_role_ids %}checked{% endif %}>
+    {{ role.name }}
+    {% if role.agent_id and role.id not in selected_role_ids %}<span class="text-xs text-muted-foreground">(currently on {{ agent_names.get(role.agent_id, "agent #" ~ role.agent_id) }})</span>{% endif %}
+  </label>
+  {% else %}
+  <p class="text-sm text-muted-foreground">No roles yet — use "New role" to add one.</p>
+  {% endfor %}
+</div>

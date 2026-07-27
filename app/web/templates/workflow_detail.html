@@ -20,6 +20,11 @@
       </div>
       {% if workflow.description %}<p class="text-sm text-muted-foreground">{{ workflow.description }}</p>{% endif %}
     </div>
+    <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/duplicate" class="flex-none">
+      <button type="submit" class="btn" data-variant="outline">
+        {{ icon('copy', 'size-4') }}<span>Duplicate</span>
+      </button>
+    </form>
   </div>
 
   {% if error %}
@@ -121,10 +126,14 @@
             <input id="step-description" type="text" name="description" placeholder="e.g. Legal drafts the initial contract text.">
           </div>
           <div role="group" class="field">
-            <label for="step-agent">Owned by</label>
-            <select id="step-agent" name="agent_id" class="select w-full" required>
-              {% for agent in agents %}<option value="{{ agent.id }}">{{ agent.name }}</option>{% endfor %}
-            </select>
+            <div class="flex items-center justify-between gap-2">
+              <label for="step-agent">Owned by</label>
+              <button type="button" class="btn" data-variant="ghost" data-size="sm" hx-boost="false"
+                      onclick="document.getElementById('agent-quick-dialog').showModal()">
+                {{ icon('plus', 'size-4') }}<span>New agent</span>
+              </button>
+            </div>
+            {% include "_step_agent_select.html" %}
             <p>The agent responsible for acting while a document is on this step.</p>
           </div>
           <div class="grid gap-3 sm:grid-cols-2">
@@ -261,4 +270,33 @@
     {% endif %}
   </div>
 </div>
+
+<dialog id="agent-quick-dialog" class="dialog">
+  <article>
+    <header>
+      <h2 class="section-title">Quick create agent</h2>
+      <p class="text-sm text-muted-foreground">Add an agent without leaving this page. It'll be available in the "Owned by" list right away.</p>
+    </header>
+    <form hx-post="/{{ organization.slug }}/agents/quick"
+          hx-target="#step-agent"
+          hx-select="unset"
+          hx-swap="outerHTML"
+          hx-on::after-request="if(event.detail.successful){this.reset(); this.closest('dialog').close();}"
+          class="flex flex-col gap-4 py-2">
+      <div role="group" class="field">
+        <label for="quick-agent-name">Name</label>
+        <input id="quick-agent-name" type="text" name="name" required placeholder="e.g. Legal">
+      </div>
+      <div role="group" class="field">
+        <label for="quick-agent-description">Description</label>
+        <input id="quick-agent-description" type="text" name="description" placeholder="Optional">
+      </div>
+      <div id="agent-quick-error"></div>
+      <footer class="flex justify-end gap-2">
+        <button type="button" class="btn" data-variant="ghost" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="btn">{{ icon('plus', 'size-4') }}<span>Create agent</span></button>
+      </footer>
+    </form>
+  </article>
+</dialog>
 {% endblock %}

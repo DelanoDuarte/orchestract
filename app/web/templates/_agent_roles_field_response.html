@@ -1,0 +1,6 @@
+{# htmx response for POST /roles/quick: swaps the checklist into the page and,
+   out-of-band, refreshes the dialog's error slot (cleared on success). #}
+{% include "_agent_roles_field.html" %}
+<div id="role-quick-error" hx-swap-oob="true">
+  {% if quick_error %}<p class="text-sm text-destructive">{{ quick_error }}</p>{% endif %}
+</div>

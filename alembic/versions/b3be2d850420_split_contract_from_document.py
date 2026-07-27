@@ -43,11 +43,13 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_contracts_organization_id'), 'contracts', ['organization_id'], unique=False)
 
-    # Children first: FKs point at the tables being dropped/recreated below.
-    op.drop_table('document_versions')
-    op.drop_table('workflow_history_entries')
+    # Drop in dependency order so no table is removed while another still has a
+    # foreign key pointing at it (Postgres enforces this; SQLite is lax). In
+    # particular workflow_instances references documents, so it must go first.
+    op.drop_table('document_versions')       # -> documents
+    op.drop_table('workflow_history_entries')  # -> workflow_instances
+    op.drop_table('workflow_instances')      # -> documents
     op.drop_table('documents')
-    op.drop_table('workflow_instances')
 
     op.create_table(
         'documents',

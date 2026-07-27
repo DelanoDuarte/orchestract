@@ -1,0 +1,15 @@
+# Local / direct-access overlay — auto-applied by a plain `docker compose up`
+# (Compose does NOT auto-load this when you pass explicit -f flags, so the
+# production command using docker-compose.prod.yml is unaffected).
+#
+# Publishes the app port directly and relaxes the HTTPS-only cookie so you can
+# reach it over http://localhost. Use this for local runs or when Orchestract
+# sits behind your own load balancer that terminates TLS.
+services:
+  web:
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    environment:
+      ORCHESTRACT_SESSION_COOKIE_SECURE: "false"
+      ORCHESTRACT_APP_BASE_URL: ${ORCHESTRACT_APP_BASE_URL:-http://localhost:8000}
+      ORCHESTRACT_OAUTH_REDIRECT_BASE: ${ORCHESTRACT_OAUTH_REDIRECT_BASE:-http://localhost:8000}

@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.7.1"
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Run tests
+        run: uv run pytest -q
+
+  migrations-postgres:
+    # Guards against SQLite-only migrations regressing Postgres compatibility.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: orchestract
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: orchestract
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orchestract"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      ORCHESTRACT_DATABASE_URL: postgresql+asyncpg://orchestract:postgres@localhost:5432/orchestract
+      # CI-only throwaway Fernet key (not a real secret).
+      ORCHESTRACT_STORAGE_ENCRYPTION_KEY: CMADJ6S2D5OBDgtH1MGhCoqFmS222xzRPlsVovC-N8E=
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.7.1"
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Apply migrations on Postgres
+        run: uv run alembic upgrade head
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: orchestract-web:ci

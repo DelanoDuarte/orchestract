@@ -1,0 +1,38 @@
+# Version control / CI
+.git
+.github
+.gitignore
+
+# Python caches & local virtualenv
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+wheels/
+
+# Local dev artifacts that must never enter the image
+.env
+.env.*
+!.env.example
+*.db
+storage/
+
+# Tests are not needed in the runtime image
+tests/
+
+# Docs, design assets, and large inspiration screenshots
+docs/
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+
+# Docker/compose files themselves (context only needs entrypoint via explicit COPY)
+docker-compose*.yml
+Caddyfile
+Makefile

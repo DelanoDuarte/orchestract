@@ -30,6 +30,52 @@ the organization slug/id it created.
 uv run pytest
 ```
 
+## Production deployment (Docker)
+
+The app ships with a container image and Compose stacks. Production runs on
+**PostgreSQL** (the SQLite default is dev-only) fronted by **Caddy** for automatic HTTPS.
+
+```bash
+cp .env.example .env
+# Fill in the required values. Generate a persistent encryption key:
+make keygen        # -> paste into ORCHESTRACT_STORAGE_ENCRYPTION_KEY
+# Set a strong POSTGRES_PASSWORD, plus DOMAIN + ACME_EMAIL for TLS.
+```
+
+- **Local / direct** (app on `http://localhost:8000`, http-friendly cookie):
+
+  ```bash
+  docker compose up -d --build        # or: make up
+  ```
+
+- **Production with TLS** (Caddy obtains Let's Encrypt certs for `DOMAIN`, proxies to the app):
+
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build   # or: make up-prod
+  ```
+
+What the stack does:
+
+- **`Dockerfile`** — multi-stage build with `uv` (both stages share the `python:3.13-slim` base so
+  the built virtualenv is portable), runs as a non-root user, and ships a `/healthz`-based
+  `HEALTHCHECK`.
+- **`docker/entrypoint.sh`** — applies `alembic upgrade head` (retrying while the database comes up;
+  skip with `RUN_MIGRATIONS=0`) before starting `uvicorn` with `--proxy-headers` and
+  `WEB_CONCURRENCY` workers.
+- **`docker-compose.yml`** — Postgres 16 (persistent volume, `pg_isready` healthcheck) + the web app
+  (waits for the DB to be healthy, persists the local-disk storage fallback on a volume).
+- **`docker-compose.override.yml`** — auto-applied for local runs: publishes the app port and relaxes
+  the HTTPS-only cookie. Not loaded when you pass explicit `-f` files (i.e. the prod command).
+- **`docker-compose.prod.yml` + `Caddyfile`** — adds Caddy (ports 80/443, auto-HTTPS via `DOMAIN`/
+  `ACME_EMAIL`, HSTS/security headers) and stops publishing the app port directly.
+
+Production hardening baked in: `ORCHESTRACT_SESSION_COOKIE_SECURE=true` marks the session cookie
+`Secure` (HTTPS-only), and `uvicorn --proxy-headers` trusts Caddy's `X-Forwarded-*`. `make help`
+lists convenience targets (`migrate`, `seed`, `psql`, `logs`, …).
+
+> Object storage: real deployments should point the org's primary `StorageConnection` at S3/GCS
+> (see **File storage** below) rather than the local-disk fallback, which is a single-node volume.
+
 ## Layout
 
 - `app/domain/` — aggregates and rich domain models, one package per bounded context

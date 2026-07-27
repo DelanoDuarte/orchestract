@@ -1,0 +1,27 @@
+# Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+# DOMAIN and ACME_EMAIL are supplied by docker-compose.prod.yml from .env.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Terminate TLS here and proxy to the app. Caddy sets X-Forwarded-Proto/
+	# For/Host, which uvicorn honors via --proxy-headers so the app knows it's
+	# being served over HTTPS.
+	reverse_proxy web:8000
+
+	# Long-cache the fingerprint-free static assets served by the app.
+	@static path /static/*
+	header @static Cache-Control "public, max-age=86400"
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

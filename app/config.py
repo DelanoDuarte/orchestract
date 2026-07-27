@@ -22,6 +22,11 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./orchestract.db"
 
+    # Session cookie. Set ORCHESTRACT_SESSION_COOKIE_SECURE=true in production so
+    # the session cookie is only ever sent over HTTPS. Left off by default so
+    # local http://127.0.0.1 development keeps working.
+    session_cookie_secure: bool = False
+
     # File storage
     storage_encryption_key: str = Field(default_factory=_generate_ephemeral_key)
     local_storage_root: str = "./storage"

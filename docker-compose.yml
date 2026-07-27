@@ -1,0 +1,53 @@
+# Base stack: PostgreSQL + the Orchestract web app.
+#
+#   Local / direct:   docker compose up --build          (adds docker-compose.override.yml)
+#   Production (TLS):  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Values are interpolated from the project-root .env (copy .env.example first).
+name: orchestract
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orchestract}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-orchestract}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orchestract} -d ${POSTGRES_DB:-orchestract}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # ORCHESTRACT_* / ANTHROPIC_API_KEY / WEB_CONCURRENCY come from .env.
+    env_file:
+      - .env
+    environment:
+      # Point the app at the db service; overrides any DATABASE_URL in .env.
+      ORCHESTRACT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-orchestract}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-orchestract}
+      # HTTPS-only session cookie by default (see override for local http).
+      ORCHESTRACT_SESSION_COOKIE_SECURE: ${ORCHESTRACT_SESSION_COOKIE_SECURE:-true}
+    volumes:
+      # Persist the local-disk storage fallback (real deployments use S3/GCS).
+      - storage_data:/app/storage
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  pgdata:
+  storage_data:

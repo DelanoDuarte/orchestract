@@ -10,6 +10,13 @@ from app.web.routes import org_router, root_router
 app = FastAPI(title="Orchestract", description="Contract & document workflow orchestrator")
 
 
+@app.get("/healthz", include_in_schema=False)
+async def healthz() -> dict[str, str]:
+    """Liveness probe for containers / load balancers — no DB dependency so a
+    slow database never makes the process look dead."""
+    return {"status": "ok"}
+
+
 @app.exception_handler(NotAuthenticatedError)
 async def handle_not_authenticated(request: Request, exc: NotAuthenticatedError) -> RedirectResponse:
     return RedirectResponse(f"/login?next={exc.next_path}", status_code=303)

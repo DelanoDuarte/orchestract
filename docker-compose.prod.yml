@@ -1,0 +1,34 @@
+# Production overlay: fronts the web app with Caddy for automatic HTTPS.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requires DOMAIN and ACME_EMAIL in .env (Caddy uses them to obtain and renew
+# Let's Encrypt certificates). The web service is not published to the host —
+# only Caddy is — so all traffic terminates TLS at Caddy and is proxied to web.
+services:
+  web:
+    # Explicitly no host port here; reachable only via the Caddy proxy on the
+    # internal compose network.
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

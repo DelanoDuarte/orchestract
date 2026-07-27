@@ -150,7 +150,12 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
     redirect_to = next if next.startswith(f"/{organization.slug}/") else f"/{organization.slug}/"
     response = RedirectResponse(redirect_to, status_code=303)
     response.set_cookie(
-        SESSION_COOKIE_NAME, session.token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 14
+        SESSION_COOKIE_NAME,
+        session.token,
+        httponly=True,
+        samesite="lax",
+        secure=get_settings().session_cookie_secure,
+        max_age=60 * 60 * 24 * 14,
     )
     return response
 
@@ -161,14 +166,21 @@ async def logout(request: Request):
     if token:
         await user_service.delete_session(token)
     response = RedirectResponse("/login", status_code=303)
-    response.delete_cookie(SESSION_COOKIE_NAME)
+    response.delete_cookie(
+        SESSION_COOKIE_NAME, httponly=True, samesite="lax", secure=get_settings().session_cookie_secure
+    )
     return response
 
 
 def _session_response(redirect_to: str, session_token: str) -> RedirectResponse:
     response = RedirectResponse(redirect_to, status_code=303)
     response.set_cookie(
-        SESSION_COOKIE_NAME, session_token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 14
+        SESSION_COOKIE_NAME,
+        session_token,
+        httponly=True,
+        samesite="lax",
+        secure=get_settings().session_cookie_secure,
+        max_age=60 * 60 * 24 * 14,
     )
     return response
 

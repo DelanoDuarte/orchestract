@@ -160,6 +160,7 @@ class ContractOut(BaseModel):
     contract_type: str
     summary: str | None
     summary_generated_at: datetime | None
+    ai_config: dict
     created_at: datetime
     updated_at: datetime
     documents: list[DocumentOut]

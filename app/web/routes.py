@@ -38,7 +38,7 @@ from app.domain.users.exceptions import (
 )
 from app.domain.users.models import User
 from app.domain.workflow.models import WorkflowDefinition, WorkflowStatus
-from app.infrastructure.ai.client import ai_enabled
+from app.infrastructure.ai.client import ASSISTANT_TOOL_NAMES, SUPPORTED_AI_MODELS
 from app.infrastructure.billing.stripe_client import InvalidWebhookEventError, billing_enabled, construct_webhook_event
 from app.infrastructure.email.client import send_email
 from app.infrastructure.email.templates import password_reset_email_html, verification_email_html
@@ -1061,7 +1061,9 @@ async def _contract_detail_context(organization: Organization, contract_id: int,
         "total_versions": total_versions,
         "can_edit": can_edit,
         "edit_role_names": [role.name for role in edit_roles],
-        "ai_enabled": ai_enabled() and PLAN_LIMITS[Plan(organization.plan)].ai_enabled,
+        "ai_enabled": ai_service.is_available(organization, contract),
+        "ai_supported_models": SUPPORTED_AI_MODELS,
+        "ai_tool_names": ASSISTANT_TOOL_NAMES,
         "active_nav": "contracts",
     }
 
@@ -1247,3 +1249,27 @@ async def run_assistant(
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
     return templates.TemplateResponse(request, "contract_detail.html", context)
+
+
+@org_router.post("/contracts/{contract_id}/ai-config")
+async def update_ai_config(
+    contract_id: int,
+    request: Request,
+    enabled: str = Form("inherit"),
+    model: str = Form(""),
+    instructions: str = Form(""),
+    restrict_tools: str = Form(""),
+    allowed_tools: list[str] = Form([]),
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    enabled_value = {"on": True, "off": False}.get(enabled)
+    tools_value = allowed_tools if restrict_tools else None
+    try:
+        await _assert_can_edit_current_step(contract_id, current_user)
+        await contract_service.set_ai_config(contract_id, enabled_value, model or None, instructions or None, tools_value)
+    except DomainError as exc:
+        context = await _contract_detail_context(organization, contract_id, current_user)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return await contract_detail(contract_id, request, organization, current_user)

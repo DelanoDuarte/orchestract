@@ -1,5 +1,6 @@
 from collections.abc import Callable
 
+from app.domain.contracts.exceptions import InvalidAIConfigError
 from app.domain.contracts.models import Contract
 from app.domain.documents.models import Document
 from app.domain.shared.exceptions import NotFoundError
@@ -7,6 +8,7 @@ from app.domain.tenancy.exceptions import PlanLimitExceededError
 from app.domain.tenancy.plans import PLAN_LIMITS, Plan
 from app.domain.workflow.models import WorkflowTransition
 from app.domain.workflow_instances.models import WorkflowInstance
+from app.infrastructure.ai.client import ASSISTANT_TOOL_NAMES, SUPPORTED_AI_MODELS
 from app.infrastructure.db.unit_of_work import UnitOfWork
 
 _DEFAULT_DOCUMENT_NAME = "Main Document"
@@ -71,6 +73,32 @@ class ContractService:
             if contract is None:
                 raise NotFoundError(f"contract {contract_id} not found")
             contract.set_summary(summary)
+            await uow.commit()
+            return contract
+
+    async def set_ai_config(
+        self,
+        contract_id: int,
+        enabled: bool | None,
+        model: str | None,
+        instructions: str | None,
+        allowed_tools: list[str] | None,
+    ) -> Contract:
+        if model is not None and model not in SUPPORTED_AI_MODELS:
+            raise InvalidAIConfigError(f"'{model}' is not a supported model")
+        if allowed_tools is not None and not set(allowed_tools) <= set(ASSISTANT_TOOL_NAMES):
+            raise InvalidAIConfigError("allowed_tools contains an unrecognized tool name")
+        config = {
+            "enabled": enabled,
+            "model": model,
+            "instructions": instructions or None,
+            "allowed_tools": allowed_tools,
+        }
+        async with self._uow_factory() as uow:
+            contract = await uow.contracts.get(contract_id)
+            if contract is None:
+                raise NotFoundError(f"contract {contract_id} not found")
+            contract.set_ai_config(config)
             await uow.commit()
             return contract
 

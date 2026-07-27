@@ -13,7 +13,7 @@ from app.domain.shared.exceptions import DomainError
 from app.domain.tenancy.models import Organization
 from app.domain.tenancy.plans import PLAN_LIMITS, Plan
 from app.domain.users.models import User
-from app.infrastructure.ai.client import AI_MODEL, ai_enabled, get_anthropic_client
+from app.infrastructure.ai.client import AI_MODEL, ASSISTANT_TOOL_NAMES, ai_enabled, get_anthropic_client
 
 _SUMMARIZABLE_CONTENT_TYPES = {"text/plain", "text/markdown"}
 _MAX_ASSISTANT_TURNS = 12
@@ -50,22 +50,42 @@ class AIService:
         self._role_service = role_service
         self._workflow_service = workflow_service
 
-    def _require_enabled(self, organization: Organization) -> None:
+    def is_available(self, organization: Organization, contract: Contract) -> bool:
+        """The org/plan gate is a hard ceiling a contract can never opt back
+        into (a contract can only turn AI *off*, never turn it on beyond
+        what the org's plan allows); `ai_config["enabled"] is False` is a
+        per-contract escape hatch for cases too sensitive for AI regardless
+        of plan."""
         if not ai_enabled() or not PLAN_LIMITS[Plan(organization.plan)].ai_enabled:
+            return False
+        return contract.ai_config.get("enabled") is not False
+
+    def _require_enabled(self, organization: Organization, contract: Contract) -> None:
+        if not self.is_available(organization, contract):
             raise AIUnavailableError()
 
-    async def _complete(self, prompt: str) -> str:
+    def _resolve_model(self, contract: Contract) -> str:
+        return contract.ai_config.get("model") or AI_MODEL
+
+    def _append_instructions(self, prompt: str, contract: Contract) -> str:
+        instructions = contract.ai_config.get("instructions")
+        if not instructions:
+            return prompt
+        return f"{prompt}\n\nAdditional instructions for this contract: {instructions}"
+
+    async def _complete(self, prompt: str, model: str) -> str:
         client = get_anthropic_client()
         response = await client.messages.create(
-            model=AI_MODEL,
+            model=model,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
         return next((block.text for block in response.content if block.type == "text"), "").strip()
 
     async def summarize_document(self, document_id: int, organization: Organization) -> Document:
-        self._require_enabled(organization)
         document = await self._document_service.get(document_id)
+        contract = await self._contract_service.get(document.contract_id)
+        self._require_enabled(organization, contract)
         version = document.latest_version()
         if version is None:
             raise NoVersionsError()
@@ -73,15 +93,17 @@ class AIService:
             raise UnsupportedContentTypeError(version.content_type)
         content = await self._document_service.download_version(version)
         text = content.decode("utf-8", errors="replace")
-        summary = await self._complete(
+        prompt = self._append_instructions(
             "Summarize this document in 3-5 sentences for someone managing the contract it "
-            f"belongs to.\n\nDocument: {document.name}\n\n{text}"
+            f"belongs to.\n\nDocument: {document.name}\n\n{text}",
+            contract,
         )
+        summary = await self._complete(prompt, self._resolve_model(contract))
         return await self._document_service.set_summary(document_id, summary)
 
     async def summarize_contract(self, contract_id: int, organization: Organization) -> Contract:
-        self._require_enabled(organization)
         contract = await self._contract_service.get(contract_id)
+        self._require_enabled(organization, contract)
         instance = await self._contract_service.get_instance(contract_id)
         sections = [
             f"Contract: {contract.title} ({contract.contract_type})",
@@ -97,18 +119,25 @@ class AIService:
             else:
                 content = await self._document_service.download_version(version)
                 sections.append(f"Document '{document.name}':\n{content.decode('utf-8', errors='replace')}")
-        summary = await self._complete(
+        prompt = self._append_instructions(
             "Summarize this contract in a short paragraph for someone managing it -- cover its "
-            "purpose, current status, and any notable terms from its documents:\n\n" + "\n\n".join(sections)
+            "purpose, current status, and any notable terms from its documents:\n\n" + "\n\n".join(sections),
+            contract,
         )
+        summary = await self._complete(prompt, self._resolve_model(contract))
         return await self._contract_service.set_summary(contract_id, summary)
 
     async def run_assistant(
         self, contract_id: int, instruction: str, current_user: User, organization: Organization
     ) -> dict:
-        self._require_enabled(organization)
+        contract = await self._contract_service.get(contract_id)
+        self._require_enabled(organization, contract)
         client = get_anthropic_client()
         actor = f"AI Assistant (on behalf of {current_user.name})"
+        allowed_tools = contract.ai_config.get("allowed_tools")
+        if allowed_tools is None:
+            allowed_tools = list(ASSISTANT_TOOL_NAMES)
+        system_prompt = self._append_instructions(_ASSISTANT_SYSTEM_PROMPT, contract)
 
         async def _assert_can_edit() -> None:
             try:
@@ -193,12 +222,19 @@ class AIService:
                 raise ToolError(str(exc)) from exc
             return f"Uploaded a new version of document {document_id}."
 
+        mutating_tools = {
+            "advance_workflow_step": advance_workflow_step,
+            "add_document_to_contract": add_document_to_contract,
+            "upload_document_version": upload_document_version,
+        }
+        tools = [get_contract_state] + [mutating_tools[name] for name in ASSISTANT_TOOL_NAMES if name in allowed_tools]
+
         runner = client.beta.messages.tool_runner(
-            model=AI_MODEL,
+            model=self._resolve_model(contract),
             max_tokens=4096,
             max_iterations=_MAX_ASSISTANT_TURNS,
-            system=[{"type": "text", "text": _ASSISTANT_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            tools=[get_contract_state, advance_workflow_step, add_document_to_contract, upload_document_version],
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
+            tools=tools,
             messages=[{"role": "user", "content": instruction}],
         )
 

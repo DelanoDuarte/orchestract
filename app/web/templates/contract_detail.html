@@ -236,6 +236,68 @@
 </div>
 {% endif %}
 
+{% if can_edit %}
+<div class="card mt-6" data-size="sm">
+  <header>
+    <h2>{{ icon('settings', 'size-4 inline') }} AI settings for this contract</h2>
+    <p>Override the organization's AI defaults for this contract only -- e.g. disable AI on a
+       sensitive case, use a different model, add case-specific instructions, or restrict the
+       assistant to read-only.</p>
+  </header>
+  <section>
+    <details>
+      <summary class="btn" data-variant="outline" data-size="sm" style="cursor:pointer;list-style:none">
+        {{ icon('chevron-down', 'size-4') }}<span>Configure</span>
+      </summary>
+      <form method="post" action="/{{ organization.slug }}/contracts/{{ contract.id }}/ai-config"
+            class="mt-4 flex flex-col gap-4">
+        {% set cfg = contract.ai_config %}
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div role="group" class="field">
+            <label for="ai-config-enabled">Availability</label>
+            <select id="ai-config-enabled" name="enabled">
+              <option value="inherit" {{ "selected" if cfg.get("enabled") is none }}>Inherit from plan (default)</option>
+              <option value="on" {{ "selected" if cfg.get("enabled") == true }}>Force on</option>
+              <option value="off" {{ "selected" if cfg.get("enabled") == false }}>Force off</option>
+            </select>
+          </div>
+          <div role="group" class="field">
+            <label for="ai-config-model">Model</label>
+            <select id="ai-config-model" name="model">
+              <option value="" {{ "selected" if not cfg.get("model") }}>Default</option>
+              {% for m in ai_supported_models %}
+              <option value="{{ m }}" {{ "selected" if cfg.get("model") == m }}>{{ m }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div role="group" class="field">
+          <label for="ai-config-instructions">Additional instructions</label>
+          <textarea id="ai-config-instructions" name="instructions"
+                    placeholder="e.g. This is a Tier-2 corporate KYC case in the EU -- apply enhanced due diligence and flag beneficial-ownership documents older than 12 months.">{{ cfg.get("instructions") or "" }}</textarea>
+        </div>
+        <div role="group" class="field">
+          <label>
+            <input type="checkbox" name="restrict_tools" value="1" {{ "checked" if cfg.get("allowed_tools") is not none }}>
+            Restrict which actions the assistant may take
+          </label>
+          <div class="mt-2 flex flex-col gap-1.5 pl-6">
+            {% for t in ai_tool_names %}
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="allowed_tools" value="{{ t }}"
+                     {{ "checked" if cfg.get("allowed_tools") is none or t in cfg.get("allowed_tools") }}>
+              {{ t.replace('_', ' ')|title }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button type="submit" class="btn self-start" data-size="sm">Save AI settings</button>
+      </form>
+    </details>
+  </section>
+</div>
+{% endif %}
+
 <div class="card mt-6" data-size="sm">
   <header><h2>History</h2></header>
   <div class="table-container">

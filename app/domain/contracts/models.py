@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.contracts.exceptions import EmptyContractTitleError
@@ -30,6 +30,7 @@ class Contract(Base):
     contract_type: Mapped[str] = mapped_column(String(100))
     summary: Mapped[str | None] = mapped_column(Text, default=None)
     summary_generated_at: Mapped[datetime | None] = mapped_column(default=None)
+    ai_config: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow)
 
@@ -52,6 +53,7 @@ class Contract(Base):
             title=title,
             description=description,
             contract_type=contract_type,
+            ai_config={},
         )
 
     def add_document(self, name: str) -> "Document":
@@ -65,3 +67,12 @@ class Contract(Base):
     def set_summary(self, summary: str) -> None:
         self.summary = summary
         self.summary_generated_at = utcnow()
+
+    def set_ai_config(self, config: dict) -> None:
+        """Stores this contract's optional per-contract AI override (see
+        AIService for how `enabled`/`model`/`instructions`/`allowed_tools`
+        are interpreted). Validating the values themselves is the
+        application layer's job -- it's the one allowed to know about
+        AI-specific constants like supported model names."""
+        self.ai_config = config
+        self.updated_at = utcnow()

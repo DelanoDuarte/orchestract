@@ -4,7 +4,7 @@ COMPOSE_PROD = docker compose -f docker-compose.yml -f docker-compose.prod.yml
 
 .DEFAULT_GOAL := help
 
-.PHONY: help keygen build up up-prod down down-prod logs logs-prod ps migrate seed shell psql test
+.PHONY: help keygen build up up-prod down down-prod logs logs-prod ps migrate seed stripe-setup shell psql test
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -42,6 +42,9 @@ migrate: ## Run database migrations in the web container
 
 seed: ## Seed demo data (org, agents, a workflow, a document)
 	$(COMPOSE) run --rm web python -m app.infrastructure.seed
+
+stripe-setup: ## Create Stripe products & prices (idempotent; needs STRIPE keys in .env)
+	$(COMPOSE) run --rm web python -m app.infrastructure.billing.setup_stripe
 
 shell: ## Open a shell in the web container
 	$(COMPOSE) exec web sh

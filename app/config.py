@@ -47,8 +47,12 @@ class Settings(BaseSettings):
     app_base_url: str = "http://127.0.0.1:8000"
 
     # Stripe (test mode). Empty by default -- billing pages render a "not
-    # configured" state until an administrator sets these.
+    # configured" state until an administrator sets these. Prefer a restricted
+    # API key (rk_...) over a full secret key in production. Create the products
+    # and prices with `uv run python -m app.infrastructure.billing.setup_stripe`,
+    # which prints the price ids to paste below.
     stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_price_team: str = ""
     stripe_price_business: str = ""

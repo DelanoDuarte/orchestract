@@ -10,6 +10,7 @@ import asyncio
 
 from app.api.deps import (
     agent_service,
+    compliance_service,
     contract_service,
     document_service,
     organization_service,
@@ -110,6 +111,8 @@ async def main() -> None:
     for name, email, password, role_name in USER_DEFINITIONS:
         user = await user_service.create_user(organization.id, name, email, password, roles_by_name[role_name].id)
         await user_service.force_verify(user.id)
+        # Demo accounts consent up front so they don't hit the terms gate on login.
+        await compliance_service.record_acceptance(user.id, organization.id)
         print(f"  {email} / {password}  ({role_name})")
 
     definition = await workflow_service.create_definition(

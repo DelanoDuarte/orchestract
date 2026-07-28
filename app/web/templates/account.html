@@ -57,5 +57,26 @@
       </section>
     </div>
   </div>
+
+  <div class="card mt-6">
+    <header class="border-b border-border px-4 py-3">
+      <h2 class="section-title">Legal &amp; compliance</h2>
+      <p class="text-sm text-muted-foreground">Your acceptance of our Terms &amp; Conditions.</p>
+    </header>
+    <section class="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+      {% if terms_acceptance %}
+      <div class="text-muted-foreground">
+        Accepted version <strong class="text-foreground">{{ terms_acceptance.version }}</strong>
+        on {{ terms_acceptance.accepted_at.strftime('%B %-d, %Y at %H:%M UTC') }}.
+        {% if terms_acceptance.version != terms_version %}
+        <span class="badge badge-muted ml-1">Update available</span>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="text-muted-foreground">No acceptance on record.</div>
+      {% endif %}
+      <a href="/terms" class="btn" data-variant="outline" data-size="sm">{{ icon('shield', 'size-4') }}<span>View Terms</span></a>
+    </section>
+  </div>
 </div>
 {% endblock %}

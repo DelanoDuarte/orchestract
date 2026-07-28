@@ -40,6 +40,7 @@ class _FakeUow:
         self.roles = _IdAssigningRepo(counter)
         self.users = _FakeUsersRepo(counter, existing_email)
         self.user_tokens = _IdAssigningRepo(counter)
+        self.terms_acceptances = _IdAssigningRepo(counter)
 
     async def __aenter__(self) -> "_FakeUow":
         return self
@@ -56,7 +57,9 @@ def test_register_creates_organization_role_user_and_token_atomically():
     service = RegistrationService(lambda: uow)
 
     organization, user, token = asyncio.run(
-        service.register("Acme Corp", "Dana Drafter", "dana@example.com", "password123")
+        service.register(
+            "Acme Corp", "Dana Drafter", "dana@example.com", "password123", "2026-07-28", "203.0.113.7", "pytest-UA"
+        )
     )
 
     assert isinstance(organization, Organization)
@@ -71,6 +74,11 @@ def test_register_creates_organization_role_user_and_token_atomically():
     assert isinstance(role, Role)
     assert role.name == "Owner"
     assert user.role_id == role.id
+    acceptance = uow.terms_acceptances.added[0]
+    assert acceptance.user_id == user.id
+    assert acceptance.organization_id == organization.id
+    assert acceptance.version == "2026-07-28"
+    assert acceptance.ip_address == "203.0.113.7"
 
 
 def test_register_rejects_duplicate_email():
@@ -78,4 +86,6 @@ def test_register_rejects_duplicate_email():
     service = RegistrationService(lambda: uow)
 
     with pytest.raises(DuplicateEmailError):
-        asyncio.run(service.register("Acme Corp", "Dana Drafter", "dana@example.com", "password123"))
+        asyncio.run(
+            service.register("Acme Corp", "Dana Drafter", "dana@example.com", "password123", "2026-07-28")
+        )

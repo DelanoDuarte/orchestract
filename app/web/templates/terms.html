@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Terms & Conditions{% endblock %}
+{% block content %}
+<div class="reveal mx-auto w-full max-w-3xl py-6 sm:py-10">
+  <div class="mb-6 flex items-start gap-3">
+    <span class="icon-chip">{{ icon('shield', 'size-5') }}</span>
+    <div class="space-y-1">
+      <h1 class="page-title">Terms &amp; Conditions</h1>
+      <p class="text-sm text-muted-foreground">
+        Effective {{ terms_effective_date.strftime('%B %-d, %Y') }} · Version {{ terms_version }}
+      </p>
+    </div>
+  </div>
+
+  {% if acceptance %}
+  <div class="alert mb-6">
+    {{ icon('circle-check-big', 'size-4') }}
+    <h2>You've accepted these terms</h2>
+    <section>
+      You accepted version <strong>{{ acceptance.version }}</strong> on
+      {{ acceptance.accepted_at.strftime('%B %-d, %Y at %H:%M UTC') }}.
+      {% if acceptance.version != terms_version %}
+      A newer version is now in effect — you'll be asked to review it on your next sign-in.
+      {% endif %}
+    </section>
+  </div>
+  {% endif %}
+
+  <div class="alert mb-8" data-variant="destructive">
+    {{ icon('zap', 'size-4') }}
+    <h2>Template — not yet legal advice</h2>
+    <section>
+      This is a scaffold to be reviewed and finalized by your legal counsel before launch. Sections marked
+      <em>[PLACEHOLDER]</em> need your reviewed wording. It is structured for a service that stores customers'
+      documents and contracts in cloud storage.
+    </section>
+  </div>
+
+  <article class="flex flex-col gap-8 text-sm leading-relaxed text-foreground">
+    <section class="space-y-2">
+      <h2 class="section-title">1. Acceptance of these Terms</h2>
+      <p class="text-muted-foreground">
+        By creating an account or using Orchestract (the “Service”), you agree to these Terms &amp; Conditions on
+        behalf of yourself and your organization. If you do not agree, you may not use the Service.
+        <em>[PLACEHOLDER — confirm contracting entity, governing law, and jurisdiction.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">2. The Service</h2>
+      <p class="text-muted-foreground">
+        Orchestract helps organizations author, route, and manage documents and contracts through configurable
+        workflows, with optional AI assistance. <em>[PLACEHOLDER — describe the exact features covered, plan
+        entitlements, and any usage limits.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">3. Your data &amp; cloud storage</h2>
+      <p class="text-muted-foreground">
+        You retain all rights to the documents, contracts, and files you upload (“Customer Data”). You grant us a
+        limited licence to store and process Customer Data solely to provide the Service. Files may be stored in
+        cloud object storage (e.g. local disk, Amazon S3, MinIO, Google Cloud Storage) and, where you connect them,
+        imported from third-party drives you authorize. <em>[PLACEHOLDER — specify storage regions, encryption at
+        rest/in transit, and data ownership guarantees.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">4. Sub-processors</h2>
+      <p class="text-muted-foreground">
+        We use third-party providers to operate the Service, which may include cloud hosting and storage, payment
+        processing, email delivery, and AI model providers. Customer Data may be processed by these sub-processors
+        strictly to deliver the Service. <em>[PLACEHOLDER — publish and maintain a current sub-processor list and a
+        mechanism to notify customers of changes.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">5. Data retention &amp; deletion</h2>
+      <p class="text-muted-foreground">
+        Customer Data is retained for as long as your account is active and as described in your workflow's
+        archival and destruction stages. On request or account closure, we will delete or return Customer Data
+        within a defined period, subject to legal retention obligations. <em>[PLACEHOLDER — state exact retention
+        windows, backup deletion timelines, and export options.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">6. Security</h2>
+      <p class="text-muted-foreground">
+        We implement reasonable technical and organizational measures to protect Customer Data. You are responsible
+        for safeguarding your credentials and for the actions of users in your organization. <em>[PLACEHOLDER —
+        reference your security program, certifications, and breach-notification commitments.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">7. Acceptable use</h2>
+      <p class="text-muted-foreground">
+        You agree not to upload unlawful content, infringe others' rights, attempt to breach security, or use the
+        Service to violate applicable laws or regulations. <em>[PLACEHOLDER — enumerate prohibited uses and
+        enforcement/suspension rights.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">8. AI features</h2>
+      <p class="text-muted-foreground">
+        Where enabled, AI features may process Customer Data to generate summaries and suggestions. AI output may be
+        inaccurate and must not be relied upon as legal advice; review all output before acting on it.
+        <em>[PLACEHOLDER — clarify AI provider data handling, training use, and human-review expectations.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">9. Fees &amp; billing</h2>
+      <p class="text-muted-foreground">
+        Paid plans are billed as described at checkout. <em>[PLACEHOLDER — set out pricing, renewal, refunds, taxes,
+        and cancellation terms.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">10. Disclaimers &amp; limitation of liability</h2>
+      <p class="text-muted-foreground">
+        The Service is provided “as is” without warranties of any kind, and our liability is limited to the maximum
+        extent permitted by law. <em>[PLACEHOLDER — insert warranty disclaimer and liability cap reviewed by
+        counsel.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">11. Changes to these Terms</h2>
+      <p class="text-muted-foreground">
+        We may update these Terms from time to time. When we do, we publish a new version and ask you to review and
+        accept it before continuing to use the Service. Continued use after acceptance constitutes agreement to the
+        updated Terms. <em>[PLACEHOLDER — define notice period for material changes.]</em>
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="section-title">12. Contact</h2>
+      <p class="text-muted-foreground">
+        Questions about these Terms? <em>[PLACEHOLDER — add your legal/support contact address.]</em>
+      </p>
+    </section>
+  </article>
+
+  <div class="mt-10 flex flex-wrap items-center gap-3 border-t border-border pt-6">
+    {% if current_user(request) %}
+    <a href="/terms/review" class="btn">{{ icon('arrow-right', 'size-4') }}<span>Review &amp; accept</span></a>
+    {% else %}
+    <a href="/signup" class="btn">{{ icon('user-plus', 'size-4') }}<span>Create an account</span></a>
+    {% endif %}
+    <a href="/" class="btn" data-variant="ghost">Back to home</a>
+  </div>
+</div>
+{% endblock %}

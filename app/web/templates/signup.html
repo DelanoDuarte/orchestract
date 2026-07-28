@@ -34,6 +34,14 @@
         <label for="signup-password">Password</label>
         <input id="signup-password" type="password" name="password" required minlength="8" placeholder="At least 8 characters">
       </div>
+      <label class="flex items-start gap-2 text-sm font-normal text-muted-foreground">
+        <input type="checkbox" name="accept_terms" value="yes" required class="mt-0.5">
+        <span>
+          I have read and agree to the
+          <a href="/terms" target="_blank" class="font-medium text-primary hover:underline" hx-boost="false">Terms &amp; Conditions</a>,
+          including how my organization's documents and contracts are stored.
+        </span>
+      </label>
       <button type="submit" class="btn w-full">Create account</button>
     </form>
   </div>

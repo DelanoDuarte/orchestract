@@ -10,6 +10,7 @@ from app.api.deps import (
     agent_service,
     ai_service,
     billing_service,
+    compliance_service,
     contract_service,
     current_role_for_template,
     current_user_dep,
@@ -27,6 +28,7 @@ from app.api.deps import (
 from app.application.permissions import assert_can_edit_contract_step
 from app.application.workflow_presets import PRESETS_BY_KEY, WORKFLOW_PRESETS, WorkflowPreset
 from app.config import get_settings
+from app.domain.compliance.terms import CURRENT_TERMS_VERSION, TERMS_EFFECTIVE_DATE
 from app.domain.shared.types import slugify
 from app.domain.shared.exceptions import DomainError, NotFoundError
 from app.domain.storage.models import StorageProvider
@@ -60,6 +62,8 @@ templates.env.globals["icon"] = icon
 templates.env.globals["step_icon"] = step_icon_name
 templates.env.globals["current_user"] = current_user_for_template
 templates.env.globals["current_role"] = current_role_for_template
+templates.env.globals["terms_version"] = CURRENT_TERMS_VERSION
+templates.env.globals["terms_effective_date"] = TERMS_EFFECTIVE_DATE
 
 root_router = APIRouter()
 org_router = APIRouter(prefix="/{org_slug}", dependencies=[Depends(enforce_login_and_membership)])
@@ -125,6 +129,77 @@ async def pricing_page(request: Request):
     return templates.TemplateResponse(
         request, "pricing.html", {"full_width": True, "plan_limits": PLAN_LIMITS}
     )
+
+
+async def _user_from_request(request: Request) -> User | None:
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    return await user_service.get_user_by_session_token(token) if token else None
+
+
+@root_router.get("/terms")
+async def terms_page(request: Request):
+    """Public Terms & Conditions, always readable (linked from signup, the
+    footer, and the consent screen). If a user is signed in, we surface which
+    version they last accepted."""
+    user = await _user_from_request(request)
+    acceptance = await compliance_service.latest_acceptance(user.id) if user else None
+    return templates.TemplateResponse(
+        request,
+        "terms.html",
+        {"full_width": True, "acceptance": acceptance},
+    )
+
+
+@root_router.get("/terms/review")
+async def terms_review(request: Request):
+    """Consent gate: shown to a logged-in user who hasn't accepted the current
+    terms (the login gate redirects here). Already-accepted users are bounced
+    to their dashboard; logged-out visitors go to sign in."""
+    user = await _user_from_request(request)
+    if user is None:
+        return RedirectResponse("/login?next=/terms/review", status_code=303)
+    if await compliance_service.has_accepted_current(user.id):
+        organization = await organization_service.get(user.organization_id)
+        return RedirectResponse(f"/{organization.slug}/", status_code=303)
+    return templates.TemplateResponse(request, "terms_review.html", {"full_width": True})
+
+
+@root_router.post("/terms/accept")
+async def terms_accept(request: Request):
+    user = await _user_from_request(request)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    ip_address, user_agent = _client_metadata(request)
+    await compliance_service.record_acceptance(user.id, user.organization_id, ip_address, user_agent)
+    organization = await organization_service.get(user.organization_id)
+    return RedirectResponse(f"/{organization.slug}/", status_code=303)
+
+
+@root_router.post("/terms/decline")
+async def terms_decline(request: Request):
+    """Declining ends the session -- without acceptance the user can't use a
+    service that stores their documents, so we log them out cleanly."""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if token:
+        await user_service.delete_session(token)
+    response = templates.TemplateResponse(
+        request,
+        "auth_notice.html",
+        {
+            "heading": "Terms not accepted",
+            "message": (
+                "You've been signed out because the Terms & Conditions weren't accepted. "
+                "You can sign back in and accept them at any time to continue."
+            ),
+            "is_error": False,
+            "action_href": "/login",
+            "action_label": "Back to sign in",
+        },
+    )
+    response.delete_cookie(
+        SESSION_COOKIE_NAME, httponly=True, samesite="lax", secure=get_settings().session_cookie_secure
+    )
+    return response
 
 
 @root_router.get("/oauth/{provider}/callback")
@@ -199,6 +274,14 @@ async def signup_page(request: Request, plan: str = ""):
     return templates.TemplateResponse(request, "signup.html", {"plan": plan})
 
 
+def _client_metadata(request: Request) -> tuple[str | None, str | None]:
+    """Best-effort client IP + User-Agent for consent audit records. Honors the
+    X-Forwarded-For set by the Caddy reverse proxy in front of the app."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else None)
+    return ip, request.headers.get("user-agent")
+
+
 @root_router.post("/signup")
 async def signup_submit(
     request: Request,
@@ -206,11 +289,26 @@ async def signup_submit(
     user_name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
+    accept_terms: str = Form(""),
     plan: str = Form(""),
 ):
+    if not accept_terms:
+        return templates.TemplateResponse(
+            request,
+            "signup.html",
+            {
+                "error": "You must accept the Terms & Conditions to create an account.",
+                "organization_name": organization_name,
+                "user_name": user_name,
+                "email": email,
+                "plan": plan,
+            },
+            status_code=422,
+        )
+    ip_address, user_agent = _client_metadata(request)
     try:
         organization, user, token = await registration_service.register(
-            organization_name, user_name, email, password
+            organization_name, user_name, email, password, CURRENT_TERMS_VERSION, ip_address, user_agent
         )
     except DomainError as exc:
         return templates.TemplateResponse(
@@ -703,6 +801,7 @@ async def _account_context(organization: Organization, current_user: User) -> di
         "organization": organization,
         "current_user_obj": current_user,
         "current_role_obj": role,
+        "terms_acceptance": await compliance_service.latest_acceptance(current_user.id),
     }
 
 

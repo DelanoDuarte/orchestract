@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from app.domain.compliance.models import TermsAcceptance
+
+
+class TermsAcceptanceRepository(Protocol):
+    async def add(self, acceptance: TermsAcceptance) -> None: ...
+
+    async def has_accepted(self, user_id: int, version: str) -> bool: ...
+
+    async def get_latest_for_user(self, user_id: int) -> TermsAcceptance | None: ...
+
+    async def list_for_organization(self, organization_id: int) -> list[TermsAcceptance]: ...

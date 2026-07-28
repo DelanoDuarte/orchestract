@@ -3,6 +3,7 @@ from fastapi import Depends, Header, Request
 from app.application.agent_service import AgentService
 from app.application.ai_service import AIService
 from app.application.billing_service import BillingService
+from app.application.compliance_service import ComplianceService
 from app.application.contract_service import ContractService
 from app.application.document_service import DocumentService
 from app.application.organization_service import OrganizationService
@@ -29,6 +30,13 @@ class NotAuthenticatedError(Exception):
         self.next_path = next_path
 
 
+class TermsNotAcceptedError(Exception):
+    """Raised when a logged-in user has not accepted the current Terms &
+    Conditions version. Maps (via a handler in main.py) to a redirect to the
+    consent screen, so a user can't reach any organization data until they
+    accept -- the compliance gate for storing their documents in the cloud."""
+
+
 def uow_factory() -> UnitOfWork:
     return UnitOfWork(async_session_factory)
 
@@ -43,6 +51,7 @@ role_service = RoleService(uow_factory)
 user_service = UserService(uow_factory)
 registration_service = RegistrationService(uow_factory)
 billing_service = BillingService(uow_factory)
+compliance_service = ComplianceService(uow_factory)
 ai_service = AIService(contract_service, document_service, role_service, workflow_service)
 
 
@@ -101,6 +110,8 @@ async def enforce_login_and_membership(
         raise NotAuthenticatedError(next_path=str(request.url.path))
     if user.organization_id != organization.id:
         raise NotAuthenticatedError(next_path=f"/{organization.slug}/")
+    if not await compliance_service.has_accepted_current(user.id):
+        raise TermsNotAcceptedError()
     request.state.current_user = user
     request.state.current_role = await role_service.get(user.role_id)
 

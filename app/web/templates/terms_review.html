@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Review the Terms{% endblock %}
+{% block content %}
+<div class="reveal mx-auto flex w-full max-w-xl flex-col gap-6 py-6 sm:py-12">
+  <div class="flex flex-col items-center gap-3 text-center">
+    <span class="icon-chip">{{ icon('shield', 'size-5') }}</span>
+    <div class="space-y-1">
+      <h1 class="page-title">Before you continue</h1>
+      <p class="text-sm text-muted-foreground">
+        Please review and accept our Terms &amp; Conditions to keep using Orchestract.
+      </p>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <p class="text-sm text-muted-foreground">
+      Orchestract stores your organization's documents and contracts, and processes them through the workflows and
+      cloud storage you configure. Our Terms &amp; Conditions explain how your data is stored, who processes it, how
+      long it is retained, and your responsibilities as a user.
+    </p>
+    <p class="mt-3 text-sm">
+      <a href="/terms" target="_blank" class="font-medium text-primary hover:underline" hx-boost="false">
+        Read the full Terms &amp; Conditions (version {{ terms_version }})
+      </a>
+    </p>
+
+    <div class="mt-6 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row-reverse">
+      <form method="post" action="/terms/accept" class="sm:flex-1" hx-boost="false">
+        <button type="submit" class="btn w-full">
+          {{ icon('circle-check-big', 'size-4') }}<span>I accept the Terms</span>
+        </button>
+      </form>
+      <form method="post" action="/terms/decline" class="sm:flex-1" hx-boost="false">
+        <button type="submit" class="btn w-full" data-variant="ghost">Decline &amp; sign out</button>
+      </form>
+    </div>
+    <p class="mt-3 text-xs text-muted-foreground">
+      Accepting records the version, date, and time for your organization's compliance records. Declining signs you
+      out — you can accept later to regain access.
+    </p>
+  </div>
+</div>
+{% endblock %}

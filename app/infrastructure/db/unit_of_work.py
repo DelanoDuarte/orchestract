@@ -12,6 +12,9 @@ from app.infrastructure.db.repositories.roles import SqlAlchemyRoleRepository
 from app.infrastructure.db.repositories.storage_connections import (
     SqlAlchemyStorageConnectionRepository,
 )
+from app.infrastructure.db.repositories.terms_acceptances import (
+    SqlAlchemyTermsAcceptanceRepository,
+)
 from app.infrastructure.db.repositories.user_sessions import (
     SqlAlchemyUserSessionRepository,
 )
@@ -46,6 +49,7 @@ class UnitOfWork:
     users: SqlAlchemyUserRepository
     user_sessions: SqlAlchemyUserSessionRepository
     user_tokens: SqlAlchemyUserTokenRepository
+    terms_acceptances: SqlAlchemyTermsAcceptanceRepository
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._session_factory = session_factory
@@ -63,6 +67,7 @@ class UnitOfWork:
         self.users = SqlAlchemyUserRepository(self.session)
         self.user_sessions = SqlAlchemyUserSessionRepository(self.session)
         self.user_tokens = SqlAlchemyUserTokenRepository(self.session)
+        self.terms_acceptances = SqlAlchemyTermsAcceptanceRepository(self.session)
         return self
 
     async def __aexit__(

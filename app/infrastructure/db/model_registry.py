@@ -5,6 +5,7 @@ classes imported at least once before it can see their tables.
 """
 
 from app.domain.agents import models as _agents_models  # noqa: F401
+from app.domain.compliance import models as _compliance_models  # noqa: F401
 from app.domain.contracts import models as _contracts_models  # noqa: F401
 from app.domain.documents import models as _documents_models  # noqa: F401
 from app.domain.shared.base import Base

@@ -73,6 +73,26 @@ Production hardening baked in: `ORCHESTRACT_SESSION_COOKIE_SECURE=true` marks th
 `Secure` (HTTPS-only), and `uvicorn --proxy-headers` trusts Caddy's `X-Forwarded-*`. `make help`
 lists convenience targets (`migrate`, `seed`, `psql`, `logs`, …).
 
+### Database (SQLite for dev, PostgreSQL for production)
+
+- **Local dev (`uv run`)** uses a zero-setup SQLite file (`orchestract.db`) — the default
+  `ORCHESTRACT_DATABASE_URL`. Convenient for hacking; never for production.
+- **Docker (local *and* prod)** runs **PostgreSQL 16**: `docker-compose.yml` overrides
+  `ORCHESTRACT_DATABASE_URL` to `postgresql+asyncpg://…@db:5432/…`, so both `make up` and
+  `make up-prod` use Postgres with no extra config. The async driver (`asyncpg`) is a dependency and
+  the entrypoint applies migrations (`alembic upgrade head`, async) on start.
+- **Non-Compose deployments** (bare `uvicorn` behind your own infra): set
+  `ORCHESTRACT_DATABASE_URL` to your Postgres DSN
+  (`postgresql+asyncpg://user:pass@host:5432/orchestract`) and `ORCHESTRACT_APP_ENV=production`.
+  Managed providers (Render, Railway, Heroku, Supabase, Fly, …) typically inject a
+  `postgres://…` or `postgresql://…?sslmode=require` URL; those are **normalized automatically** to
+  the async `asyncpg` driver (and `sslmode`→`ssl`), so you can paste the provider's URL as-is
+  without hitting `ModuleNotFoundError: No module named 'psycopg2'`.
+- **Guardrail:** when `ORCHESTRACT_APP_ENV=production` the app **refuses to boot on SQLite**, so a
+  missing or wrong `DATABASE_URL` fails fast instead of silently using the single-file dev database.
+  The prod overlay sets `APP_ENV=production` for you; the base Compose file already points the URL at
+  the Postgres `db` service.
+
 > Object storage: real deployments should point the org's primary `StorageConnection` at S3/GCS
 > (see **File storage** below) rather than the local-disk fallback, which is a single-node volume.
 

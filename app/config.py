@@ -1,11 +1,42 @@
 import logging
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from cryptography.fernet import Fernet
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_database_url(url: str) -> str:
+    """Coerce a managed-provider Postgres URL to the async driver the app and
+    Alembic use.
+
+    Managed Postgres providers (Render, Railway, Heroku, Supabase, Fly, ...)
+    hand out ``postgres://`` / ``postgresql://`` URLs, often with a
+    ``?sslmode=require`` query param. Two things break the async stack:
+
+    * No driver in the scheme -> SQLAlchemy picks its default *sync* driver,
+      psycopg2, which this async-only app doesn't install
+      (``ModuleNotFoundError: No module named 'psycopg2'``).
+    * ``sslmode`` is a libpq/psycopg2 param name; asyncpg's connect() rejects it
+      and instead takes the equivalent value under ``ssl`` (asyncpg maps the
+      libpq strings ``require``/``verify-full``/``disable``/...).
+
+    So: force the ``+asyncpg`` driver and rename ``sslmode`` -> ``ssl``. URLs
+    that already name a driver keep it; SQLite and other URLs pass through.
+    """
+    if url.startswith("postgres://"):  # Heroku-style scheme
+        url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):  # no driver -> would default to psycopg2
+        url = "postgresql+asyncpg://" + url[len("postgresql://") :]
+
+    if url.startswith("postgresql+asyncpg://") and "sslmode=" in url:
+        parts = urlsplit(url)
+        query = [(("ssl" if k == "sslmode" else k), v) for k, v in parse_qsl(parts.query, keep_blank_values=True)]
+        url = urlunsplit(parts._replace(query=urlencode(query)))
+    return url
 
 
 def _generate_ephemeral_key() -> str:
@@ -20,6 +51,17 @@ def _generate_ephemeral_key() -> str:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ORCHESTRACT_", env_file=".env", extra="ignore")
 
+    # "development" | "production". Set ORCHESTRACT_APP_ENV=production in real
+    # deployments (Docker Compose's prod overlay does). In production the app
+    # refuses to boot on SQLite (see _validate_database) so you can't ship the
+    # single-file dev database by accident.
+    app_env: str = "development"
+
+    # SQLAlchemy async URL. The SQLite default is a zero-setup convenience for
+    # `uv run` local dev only. Docker Compose overrides this to
+    # postgresql+asyncpg://...@db for both local and prod stacks; for a
+    # non-Compose deployment set ORCHESTRACT_DATABASE_URL to your Postgres DSN,
+    # e.g. postgresql+asyncpg://user:pass@host:5432/orchestract
     database_url: str = "sqlite+aiosqlite:///./orchestract.db"
 
     # Session cookie. Set ORCHESTRACT_SESSION_COOKIE_SECURE=true in production so
@@ -56,6 +98,33 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_price_team: str = ""
     stripe_price_business: str = ""
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.strip().lower() == "production"
+
+    @model_validator(mode="after")
+    def _validate_database(self) -> "Settings":
+        """Normalize the DB URL to the async driver, then guard against SQLite in
+        production (which would silently use an ephemeral single-file DB) and
+        flag SQLite use in dev so it's never a surprise."""
+        normalized = _normalize_database_url(self.database_url)
+        if normalized != self.database_url:
+            logger.info("Normalized Postgres URL to the async asyncpg driver.")
+            self.database_url = normalized
+        if self.database_url.startswith("sqlite"):
+            if self.is_production:
+                raise ValueError(
+                    "ORCHESTRACT_APP_ENV=production but ORCHESTRACT_DATABASE_URL is SQLite "
+                    f"({self.database_url!r}). Point it at PostgreSQL, e.g. "
+                    "postgresql+asyncpg://user:pass@host:5432/orchestract."
+                )
+            logger.info(
+                "Using SQLite (%s) for local development. Production must use PostgreSQL "
+                "(set ORCHESTRACT_DATABASE_URL); Docker Compose does this automatically.",
+                self.database_url,
+            )
+        return self
 
 
 @lru_cache

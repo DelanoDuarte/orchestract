@@ -11,6 +11,12 @@ services:
     # internal compose network.
     expose:
       - "8000"
+    environment:
+      # Marks this a production process: the app refuses to boot on SQLite, so a
+      # missing/incorrect ORCHESTRACT_DATABASE_URL fails fast instead of silently
+      # using the single-file dev database. (The base compose already points the
+      # URL at the Postgres `db` service.)
+      ORCHESTRACT_APP_ENV: production
 
   caddy:
     image: caddy:2-alpine

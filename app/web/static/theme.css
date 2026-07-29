@@ -254,8 +254,11 @@ body {
   border: 1px solid var(--border);
 }
 
-/* Buttons: tighter motion + elevation on primary. */
-.btn { transition: transform .12s var(--ease-out), box-shadow .15s var(--ease-out), background-color .15s var(--ease-out), color .15s var(--ease-out); font-weight: 550; }
+/* Buttons: tighter motion + elevation on primary. `vertical-align: middle`
+   keeps sibling buttons level when they sit inline in a table action cell —
+   inline-flex boxes otherwise baseline-align, so an icon+text button and a
+   text+icon button would render at slightly different heights. */
+.btn { transition: transform .12s var(--ease-out), box-shadow .15s var(--ease-out), background-color .15s var(--ease-out), color .15s var(--ease-out); font-weight: 550; vertical-align: middle; }
 .btn:active { transform: translateY(0.5px) scale(0.99); }
 .btn:not([data-variant]):not([data-variant="ghost"]):not([data-variant="outline"]):not([data-variant="secondary"]) {
   box-shadow: var(--shadow-xs);
@@ -307,6 +310,42 @@ dialog::backdrop { background: oklch(0 0 0 / 55%); backdrop-filter: blur(2px); }
 
 /* Alerts: rounded + subtle. */
 .alert { border-radius: var(--radius); }
+
+/* Toasts: transient, stacked notifications (bottom-right). Driven by a
+   short-lived `flash` cookie that client JS reads and clears on load and after
+   every htmx swap, so confirmations survive both in-place swaps and redirects. */
+#toaster {
+  position: fixed; z-index: 100; right: 1rem; bottom: 1rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  width: min(24rem, calc(100vw - 2rem)); pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--popover); color: var(--popover-foreground);
+  box-shadow: var(--shadow-lg);
+  animation: toast-in .28s var(--ease-spring) both;
+}
+.toast[data-leaving="true"] { animation: toast-out .18s var(--ease-out) both; }
+.toast .toast-icon { flex: none; margin-top: 0.05rem; }
+.toast[data-level="success"] .toast-icon { color: var(--success); }
+.toast[data-level="error"] .toast-icon { color: var(--destructive); }
+.toast[data-level="info"] .toast-icon { color: var(--primary); }
+.toast .toast-body { flex: 1; min-width: 0; font-size: 0.875rem; line-height: 1.4; }
+.toast .toast-close {
+  flex: none; display: grid; place-items: center;
+  height: 1.25rem; width: 1.25rem; margin: -0.05rem -0.15rem 0 0;
+  border-radius: var(--radius-sm); color: var(--muted-foreground);
+  font-size: 1.15rem; line-height: 1; cursor: pointer;
+  transition: color .15s var(--ease-out), background-color .15s var(--ease-out);
+}
+.toast .toast-close:hover { color: var(--foreground); background: var(--muted); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(6px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .toast, .toast[data-leaving="true"] { animation: none; } }
 
 /* Divider label ("or"). */
 .divider-label { display: flex; align-items: center; gap: 0.75rem; color: var(--muted-foreground); font-size: 0.8rem; }

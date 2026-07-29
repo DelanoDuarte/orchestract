@@ -106,6 +106,19 @@ class WorkflowDefinition(Base):
             status=WorkflowStatus.DRAFT,
         )
 
+    def rename(self, new_name: str) -> None:
+        """Renames the workflow. Name/description are metadata, so (unlike the
+        graph) they stay editable in any status -- only structural edits are
+        locked once activated."""
+        new_name = new_name.strip()
+        if not new_name:
+            raise EmptyWorkflowNameError()
+        self.name = new_name
+        self.slug = slugify(new_name)
+
+    def set_description(self, description: str | None) -> None:
+        self.description = description
+
     def _require_draft(self) -> None:
         if self.status != WorkflowStatus.DRAFT:
             raise WorkflowDefinitionLockedError(self.id)

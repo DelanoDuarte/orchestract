@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from app.domain.shared.exceptions import NotFoundError
 from app.domain.shared.types import slugify
+from app.domain.workflow.exceptions import DuplicateWorkflowNameError
 from app.domain.workflow.models import WorkflowDefinition
 from app.domain.workflow.validation import find_validation_issues
 from app.infrastructure.db.unit_of_work import UnitOfWork
@@ -30,6 +31,28 @@ class WorkflowService:
     async def list_for_organization(self, organization_id: int) -> list[WorkflowDefinition]:
         async with self._uow_factory() as uow:
             return await uow.workflow_definitions.list_for_organization(organization_id)
+
+    async def update_details(
+        self, definition_id: int, name: str, description: str | None = None
+    ) -> WorkflowDefinition:
+        """Renames a workflow and updates its description. Guards the per-org
+        slug uniqueness constraint up front so a clashing name surfaces as a
+        friendly DomainError instead of a database IntegrityError."""
+        async with self._uow_factory() as uow:
+            definition = await uow.workflow_definitions.get(definition_id)
+            if definition is None:
+                raise NotFoundError(f"workflow definition {definition_id} not found")
+            trimmed = name.strip()
+            if trimmed:
+                clash = await uow.workflow_definitions.get_by_slug(
+                    definition.organization_id, slugify(trimmed)
+                )
+                if clash is not None and clash.id != definition_id:
+                    raise DuplicateWorkflowNameError(trimmed)
+            definition.rename(name)
+            definition.set_description(description)
+            await uow.commit()
+            return definition
 
     async def add_step(
         self,

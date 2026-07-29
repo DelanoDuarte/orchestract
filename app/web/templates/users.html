@@ -36,11 +36,14 @@
               {% endif %}
             </td>
             <td class="text-end">
-              <form method="post" action="/{{ organization.slug }}/users/{{ user.id }}/toggle">
-                <button type="submit" class="btn" data-variant="outline" data-size="sm">
-                  {{ "Deactivate" if user.is_active else "Activate" }}
-                </button>
-              </form>
+              <span class="inline-flex items-center gap-1.5">
+                <a href="/{{ organization.slug }}/users/{{ user.id }}/edit" class="btn" data-variant="outline" data-size="sm">{{ icon('square-pen', 'size-4') }}<span class="hidden sm:inline">Edit</span></a>
+                <form method="post" action="/{{ organization.slug }}/users/{{ user.id }}/toggle" class="inline">
+                  <button type="submit" class="btn" data-variant="ghost" data-size="sm">
+                    {{ "Deactivate" if user.is_active else "Activate" }}
+                  </button>
+                </form>
+              </span>
             </td>
           </tr>
           {% else %}

@@ -57,6 +57,9 @@ class Role(Base):
         self.name = new_name
         self.slug = slugify(new_name)
 
+    def set_description(self, description: str | None) -> None:
+        self.description = description
+
     def set_agent(self, agent_id: int | None) -> None:
         self.agent_id = agent_id
 

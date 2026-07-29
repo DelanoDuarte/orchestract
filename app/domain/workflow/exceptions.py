@@ -6,6 +6,12 @@ class EmptyWorkflowNameError(DomainError):
         super().__init__("workflow name must not be empty")
 
 
+class DuplicateWorkflowNameError(ConflictError):
+    def __init__(self, name: str) -> None:
+        super().__init__(f"a workflow named '{name}' already exists")
+        self.name = name
+
+
 class DuplicateStepKeyError(DomainError):
     def __init__(self, key: str) -> None:
         super().__init__(f"step key '{key}' already exists in this workflow")

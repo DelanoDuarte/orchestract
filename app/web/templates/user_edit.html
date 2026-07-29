@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ user.name }}{% endblock %}
+{% block content %}
+<div class="page-narrow reveal">
+  <a href="/{{ organization.slug }}/users" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    {{ icon('arrow-right', 'size-4 rotate-180') }}<span>All users</span>
+  </a>
+  <div class="mb-6 flex items-start gap-3">
+    <span class="icon-chip">{{ icon('square-pen', 'size-5') }}</span>
+    <div class="space-y-1">
+      <h1 class="page-title">Edit user</h1>
+      <p class="text-sm text-muted-foreground">{{ user.name }}</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>
+  {% endif %}
+
+  <div class="card p-6">
+    <form method="post" action="/{{ organization.slug }}/users/{{ user.id }}/edit" class="flex flex-col gap-4">
+      <div role="group" class="field">
+        <label for="user-name">Name</label>
+        <input id="user-name" type="text" name="name" value="{{ user.name }}" required>
+      </div>
+      <div role="group" class="field">
+        <label for="user-email">Email</label>
+        <input id="user-email" type="email" value="{{ user.email }}" disabled>
+        <p>Email addresses can't be changed here.</p>
+      </div>
+      <div role="group" class="field">
+        <label for="user-role">Role</label>
+        <select id="user-role" name="role_id" class="select w-full" required>
+          {% for role in roles %}<option value="{{ role.id }}" {% if role.id == user.role_id %}selected{% endif %}>{{ role.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn w-full">Save changes</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

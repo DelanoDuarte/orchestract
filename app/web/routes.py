@@ -1,7 +1,8 @@
 import json
+import urllib.parse
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, Request, Response, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -67,6 +68,21 @@ templates.env.globals["terms_effective_date"] = TERMS_EFFECTIVE_DATE
 
 root_router = APIRouter()
 org_router = APIRouter(prefix="/{org_slug}", dependencies=[Depends(enforce_login_and_membership)])
+
+
+def _flash(response: Response, message: str, level: str = "success") -> Response:
+    """Queue a transient toast shown after the next render or redirect. A
+    short-lived cookie carries it so it survives both in-place htmx swaps and
+    303 redirects; client JS (base.html) pops and clears it on load and after
+    every htmx settle. `level` is one of "success", "error", "info"."""
+    response.set_cookie(
+        "flash",
+        urllib.parse.quote(json.dumps({"message": message, "level": level})),
+        max_age=15,
+        path="/",
+        samesite="lax",
+    )
+    return response
 
 
 async def _agent_names(organization_id: int) -> dict[int, str]:
@@ -555,7 +571,7 @@ async def create_agent(
             },
             status_code=422,
         )
-    return await agents_page(request, organization)
+    return _flash(await agents_page(request, organization), "Agent created.")
 
 
 @org_router.get("/agents/{agent_id}/edit")
@@ -609,7 +625,7 @@ async def update_agent(
             },
             status_code=422,
         )
-    return await agents_page(request, organization)
+    return _flash(await agents_page(request, organization), "Agent updated.")
 
 
 @org_router.post("/agents/{agent_id}/toggle")
@@ -619,8 +635,12 @@ async def toggle_agent(
     organization: Organization = Depends(get_current_organization_from_path),
 ):
     agent = await agent_service.get(agent_id)
-    await agent_service.set_active(agent_id, not agent.is_active)
-    return await agents_page(request, organization)
+    new_state = not agent.is_active
+    await agent_service.set_active(agent_id, new_state)
+    return _flash(
+        await agents_page(request, organization),
+        f"Agent {'activated' if new_state else 'deactivated'}.",
+    )
 
 
 @org_router.post("/agents/quick")
@@ -641,7 +661,7 @@ async def quick_create_agent(
     except DomainError as exc:
         quick_error = str(exc)
     agents = await agent_service.list_agents(organization.id)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         "_step_agent_select_response.html",
         {
@@ -652,6 +672,9 @@ async def quick_create_agent(
         },
         status_code=422 if quick_error else 200,
     )
+    if quick_error is None:
+        _flash(response, "Agent created.")
+    return response
 
 
 @org_router.get("/roles")
@@ -699,7 +722,7 @@ async def create_role(
             {"organization": organization, "agents": agents, "active_nav": "roles", "error": str(exc)},
             status_code=422,
         )
-    return await roles_page(request, organization)
+    return _flash(await roles_page(request, organization), "Role created.")
 
 
 @org_router.post("/roles/quick")
@@ -722,7 +745,7 @@ async def quick_create_role(
         quick_error = str(exc)
     roles = await role_service.list_roles(organization.id)
     agent_names = await _agent_names(organization.id)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         "_agent_roles_field_response.html",
         {
@@ -734,6 +757,55 @@ async def quick_create_role(
         },
         status_code=422 if quick_error else 200,
     )
+    if quick_error is None:
+        _flash(response, "Role created.")
+    return response
+
+
+@org_router.get("/roles/{role_id}/edit")
+async def edit_role_page(
+    role_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    role = await role_service.get(role_id)
+    agents = await agent_service.list_agents(organization.id)
+    return templates.TemplateResponse(
+        request,
+        "role_edit.html",
+        {"organization": organization, "role": role, "agents": agents, "active_nav": "roles"},
+    )
+
+
+@org_router.post("/roles/{role_id}/edit")
+async def update_role(
+    role_id: int,
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    agent_id: str = Form(""),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        await role_service.update_role(
+            role_id, name, description or None, int(agent_id) if agent_id else None
+        )
+    except DomainError as exc:
+        role = await role_service.get(role_id)
+        agents = await agent_service.list_agents(organization.id)
+        return templates.TemplateResponse(
+            request,
+            "role_edit.html",
+            {
+                "organization": organization,
+                "role": role,
+                "agents": agents,
+                "active_nav": "roles",
+                "error": str(exc),
+            },
+            status_code=422,
+        )
+    return _flash(await roles_page(request, organization), "Role updated.")
 
 
 @org_router.get("/users")
@@ -781,7 +853,7 @@ async def create_user(
             {"organization": organization, "roles": roles, "active_nav": "users", "error": str(exc)},
             status_code=422,
         )
-    return await users_page(request, organization)
+    return _flash(await users_page(request, organization), "User created.")
 
 
 @org_router.post("/users/{user_id}/toggle")
@@ -791,8 +863,55 @@ async def toggle_user(
     organization: Organization = Depends(get_current_organization_from_path),
 ):
     user = await user_service.get(user_id)
-    await user_service.set_active(user_id, not user.is_active)
-    return await users_page(request, organization)
+    new_state = not user.is_active
+    await user_service.set_active(user_id, new_state)
+    return _flash(
+        await users_page(request, organization),
+        f"User {'activated' if new_state else 'deactivated'}.",
+    )
+
+
+@org_router.get("/users/{user_id}/edit")
+async def edit_user_page(
+    user_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    user = await user_service.get(user_id)
+    roles = await role_service.list_roles(organization.id)
+    return templates.TemplateResponse(
+        request,
+        "user_edit.html",
+        {"organization": organization, "user": user, "roles": roles, "active_nav": "users"},
+    )
+
+
+@org_router.post("/users/{user_id}/edit")
+async def update_user(
+    user_id: int,
+    request: Request,
+    name: str = Form(...),
+    role_id: int = Form(...),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        await user_service.update_profile(user_id, name, role_id)
+    except DomainError as exc:
+        user = await user_service.get(user_id)
+        roles = await role_service.list_roles(organization.id)
+        return templates.TemplateResponse(
+            request,
+            "user_edit.html",
+            {
+                "organization": organization,
+                "user": user,
+                "roles": roles,
+                "active_nav": "users",
+                "error": str(exc),
+            },
+            status_code=422,
+        )
+    return _flash(await users_page(request, organization), "User updated.")
 
 
 async def _account_context(organization: Organization, current_user: User) -> dict:
@@ -829,8 +948,7 @@ async def update_account(
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "account.html", context, status_code=422)
     context = await _account_context(organization, await user_service.get(current_user.id))
-    context["success"] = "Name updated."
-    return templates.TemplateResponse(request, "account.html", context)
+    return _flash(templates.TemplateResponse(request, "account.html", context), "Name updated.")
 
 
 @org_router.post("/account/password")
@@ -848,8 +966,7 @@ async def update_password(
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "account.html", context, status_code=422)
     context = await _account_context(organization, current_user)
-    context["success"] = "Password updated."
-    return templates.TemplateResponse(request, "account.html", context)
+    return _flash(templates.TemplateResponse(request, "account.html", context), "Password updated.")
 
 
 async def _storage_settings_context(organization: Organization) -> dict:
@@ -910,7 +1027,7 @@ async def connect_bucket(
         context = await _storage_settings_context(organization)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "storage_settings.html", context, status_code=422)
-    return await storage_settings_page(request, organization)
+    return _flash(await storage_settings_page(request, organization), "Storage connected.")
 
 
 @org_router.get("/settings/storage/connect/{provider}/start")
@@ -933,7 +1050,7 @@ async def set_primary_connection(
         context = await _storage_settings_context(organization)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "storage_settings.html", context, status_code=422)
-    return await storage_settings_page(request, organization)
+    return _flash(await storage_settings_page(request, organization), "Primary storage updated.")
 
 
 @org_router.post("/settings/storage/{connection_id}/disconnect")
@@ -943,7 +1060,7 @@ async def disconnect_connection(
     organization: Organization = Depends(get_current_organization_from_path),
 ):
     await storage_service.disconnect(connection_id)
-    return await storage_settings_page(request, organization)
+    return _flash(await storage_settings_page(request, organization), "Storage disconnected.")
 
 
 async def _billing_settings_context(organization: Organization) -> dict:
@@ -1089,7 +1206,10 @@ async def create_workflow_from_preset(
             status_code=422,
         )
     definition = await _create_workflow_from_preset(organization, preset)
-    return RedirectResponse(f"/{organization.slug}/workflows/{definition.id}", status_code=303)
+    return _flash(
+        RedirectResponse(f"/{organization.slug}/workflows/{definition.id}", status_code=303),
+        "Workflow created from example.",
+    )
 
 
 @org_router.post("/workflows")
@@ -1112,7 +1232,7 @@ async def create_workflow(
             },
             status_code=422,
         )
-    return await workflows_page(request, organization)
+    return _flash(await workflows_page(request, organization), "Workflow created.")
 
 
 async def _workflow_detail_context(organization: Organization, definition_id: int) -> dict:
@@ -1160,7 +1280,7 @@ async def add_step(
         context = await _workflow_detail_context(organization, definition_id)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "workflow_detail.html", context, status_code=422)
-    return await workflow_detail(definition_id, request, organization)
+    return _flash(await workflow_detail(definition_id, request, organization), "Step added.")
 
 
 @org_router.post("/workflows/{definition_id}/transitions")
@@ -1181,7 +1301,7 @@ async def add_transition(
         context = await _workflow_detail_context(organization, definition_id)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "workflow_detail.html", context, status_code=422)
-    return await workflow_detail(definition_id, request, organization)
+    return _flash(await workflow_detail(definition_id, request, organization), "Transition added.")
 
 
 @org_router.post("/workflows/{definition_id}/activate")
@@ -1196,7 +1316,7 @@ async def activate_workflow(
         context = await _workflow_detail_context(organization, definition_id)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "workflow_detail.html", context, status_code=422)
-    return await workflow_detail(definition_id, request, organization)
+    return _flash(await workflow_detail(definition_id, request, organization), "Workflow activated.")
 
 
 @org_router.post("/workflows/{definition_id}/duplicate")
@@ -1211,7 +1331,27 @@ async def duplicate_workflow(
         context = await _workflow_detail_context(organization, definition_id)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "workflow_detail.html", context, status_code=422)
-    return RedirectResponse(f"/{organization.slug}/workflows/{copy.id}", status_code=303)
+    return _flash(
+        RedirectResponse(f"/{organization.slug}/workflows/{copy.id}", status_code=303),
+        "Workflow duplicated.",
+    )
+
+
+@org_router.post("/workflows/{definition_id}/details")
+async def update_workflow_details(
+    definition_id: int,
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    organization: Organization = Depends(get_current_organization_from_path),
+):
+    try:
+        await workflow_service.update_details(definition_id, name, description or None)
+    except DomainError as exc:
+        context = await _workflow_detail_context(organization, definition_id)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "workflow_detail.html", context, status_code=422)
+    return _flash(await workflow_detail(definition_id, request, organization), "Workflow updated.")
 
 
 @org_router.get("/contracts")
@@ -1285,7 +1425,9 @@ async def create_contract(
             },
             status_code=422,
         )
-    return await contract_detail(contract.id, request, organization, current_user)
+    return _flash(
+        await contract_detail(contract.id, request, organization, current_user), "Contract created."
+    )
 
 
 async def _contract_detail_context(organization: Organization, contract_id: int, current_user: User) -> dict:
@@ -1353,7 +1495,9 @@ async def execute_transition(
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
-    return await contract_detail(contract_id, request, organization, current_user)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "Contract updated."
+    )
 
 
 @org_router.post("/contracts/{contract_id}/documents")
@@ -1371,7 +1515,9 @@ async def add_document_to_contract(
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
-    return await contract_detail(contract_id, request, organization, current_user)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "Document added."
+    )
 
 
 @org_router.post("/contracts/{contract_id}/documents/{document_id}/versions")
@@ -1399,7 +1545,9 @@ async def upload_version(
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
-    return await contract_detail(contract_id, request, organization, current_user)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "New version uploaded."
+    )
 
 
 @org_router.get("/contracts/{contract_id}/documents/{document_id}/import/{connection_id}")
@@ -1453,7 +1601,9 @@ async def import_version(
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
-    return await contract_detail(contract_id, request, organization, current_user)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "Document imported."
+    )
 
 
 @org_router.post("/contracts/{contract_id}/summarize")
@@ -1469,7 +1619,9 @@ async def summarize_contract(
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
-    return await contract_detail(contract_id, request, organization, current_user)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "Summary generated."
+    )
 
 
 @org_router.post("/contracts/{contract_id}/documents/{document_id}/summarize")
@@ -1486,7 +1638,9 @@ async def summarize_document(
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
-    return await contract_detail(contract_id, request, organization, current_user)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "Summary generated."
+    )
 
 
 @org_router.post("/contracts/{contract_id}/assistant")
@@ -1530,4 +1684,6 @@ async def update_ai_config(
         context = await _contract_detail_context(organization, contract_id, current_user)
         context["error"] = str(exc)
         return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
-    return await contract_detail(contract_id, request, organization, current_user)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "AI settings saved."
+    )

@@ -69,6 +69,18 @@ class UserService:
             await uow.commit()
             return user
 
+    async def update_profile(self, user_id: int, name: str, role_id: int) -> User:
+        """Updates a user's display name and role in a single commit (used by
+        the admin "Edit user" form)."""
+        async with self._uow_factory() as uow:
+            user = await uow.users.get(user_id)
+            if user is None:
+                raise NotFoundError(f"user {user_id} not found")
+            user.rename(name)
+            user.set_role(role_id)
+            await uow.commit()
+            return user
+
     async def authenticate(self, email: str, raw_password: str) -> User:
         async with self._uow_factory() as uow:
             user = await uow.users.get_by_email(email)

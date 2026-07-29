@@ -20,12 +20,41 @@
       </div>
       {% if workflow.description %}<p class="text-sm text-muted-foreground">{{ workflow.description }}</p>{% endif %}
     </div>
-    <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/duplicate" class="flex-none">
-      <button type="submit" class="btn" data-variant="outline">
-        {{ icon('copy', 'size-4') }}<span>Duplicate</span>
+    <div class="flex flex-none items-center gap-2">
+      <button type="button" class="btn" data-variant="outline" hx-boost="false"
+              onclick="document.getElementById('workflow-rename-dialog').showModal()">
+        {{ icon('pen-line', 'size-4') }}<span>Rename</span>
       </button>
-    </form>
+      <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/duplicate">
+        <button type="submit" class="btn" data-variant="outline">
+          {{ icon('copy', 'size-4') }}<span>Duplicate</span>
+        </button>
+      </form>
+    </div>
   </div>
+
+  <dialog id="workflow-rename-dialog" class="dialog">
+    <article>
+      <header>
+        <h2 class="section-title">Rename workflow</h2>
+        <p class="text-sm text-muted-foreground">Update the workflow's name and description. This doesn't change its steps.</p>
+      </header>
+      <form method="post" action="/{{ organization.slug }}/workflows/{{ workflow.id }}/details" class="flex flex-col gap-4 py-2">
+        <div role="group" class="field">
+          <label for="workflow-name">Name</label>
+          <input id="workflow-name" type="text" name="name" value="{{ workflow.name }}" required>
+        </div>
+        <div role="group" class="field">
+          <label for="workflow-description">Description</label>
+          <input id="workflow-description" type="text" name="description" value="{{ workflow.description or "" }}" placeholder="Optional">
+        </div>
+        <footer class="flex justify-end gap-2">
+          <button type="button" class="btn" data-variant="ghost" hx-boost="false" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="btn">Save changes</button>
+        </footer>
+      </form>
+    </article>
+  </dialog>
 
   {% if error %}
   <div class="alert mb-6" data-variant="destructive"><section>{{ error }}</section></div>

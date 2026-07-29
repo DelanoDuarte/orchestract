@@ -48,6 +48,30 @@ class RoleService:
             await uow.commit()
             return role
 
+    async def update_role(
+        self,
+        role_id: int,
+        name: str,
+        description: str | None = None,
+        agent_id: int | None = None,
+    ) -> Role:
+        """Updates a role's name, description and linked agent in one commit,
+        guarding the per-org name/slug uniqueness (excluding the role itself)."""
+        async with self._uow_factory() as uow:
+            role = await uow.roles.get(role_id)
+            if role is None:
+                raise NotFoundError(f"role {role_id} not found")
+            trimmed = name.strip()
+            if trimmed:
+                clash = await uow.roles.get_by_slug(role.organization_id, slugify(trimmed))
+                if clash is not None and clash.id != role_id:
+                    raise DuplicateRoleNameError(trimmed)
+            role.rename(name)
+            role.set_description(description)
+            role.set_agent(agent_id)
+            await uow.commit()
+            return role
+
     async def set_agent(self, role_id: int, agent_id: int | None) -> Role:
         async with self._uow_factory() as uow:
             role = await uow.roles.get(role_id)

@@ -15,7 +15,7 @@
     <div class="table-container">
       <table class="table">
         <thead>
-          <tr><th>Name</th><th>Description</th><th>Linked agent</th></tr>
+          <tr><th>Name</th><th>Description</th><th>Linked agent</th><th></th></tr>
         </thead>
         <tbody>
           {% for role in roles %}
@@ -34,9 +34,12 @@
               <span class="badge" data-variant="outline">Open to anyone</span>
               {% endif %}
             </td>
+            <td class="text-end">
+              <a href="/{{ organization.slug }}/roles/{{ role.id }}/edit" class="btn" data-variant="outline" data-size="sm">{{ icon('square-pen', 'size-4') }}<span class="hidden sm:inline">Edit</span></a>
+            </td>
           </tr>
           {% else %}
-          <tr><td colspan="3" class="p-0">
+          <tr><td colspan="4" class="p-0">
             {% call macros.empty_state('shield', 'No roles yet', 'Create roles to control who can act on each workflow step.') %}
               <a href="/{{ organization.slug }}/roles/new" class="btn" data-size="sm">{{ icon('plus', 'size-4') }}<span>New role</span></a>
             {% endcall %}

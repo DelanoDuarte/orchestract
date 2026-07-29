@@ -3,7 +3,14 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import NotAuthenticatedError, TermsNotAcceptedError
-from app.api.routers import agents, contracts, documents, organizations, storage, workflows
+from app.api.routers import (
+    agents,
+    contracts,
+    documents,
+    organizations,
+    storage,
+    workflows,
+)
 from app.domain.shared.exceptions import ConflictError, DomainError, NotFoundError
 from app.web.routes import org_router, root_router
 

@@ -198,6 +198,63 @@
   </div>
 </div>
 
+<div id="toaster" aria-live="polite" aria-atomic="false"></div>
+
+<script>
+  // Transient toast notifications. Mutations set a short-lived `flash` cookie
+  // (see _flash in routes.py); we pop it into a toast and clear it after each
+  // page load and htmx swap, so it works for in-place swaps and redirects alike.
+  (function () {
+    var ICONS = {
+      success: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>',
+      error: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>',
+      info: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
+    };
+
+    window.showToast = function (message, level) {
+      level = ICONS[level] ? level : "info";
+      var host = document.getElementById("toaster");
+      if (!host || !message) return;
+      var el = document.createElement("div");
+      el.className = "toast";
+      el.setAttribute("data-level", level);
+      el.setAttribute("role", level === "error" ? "alert" : "status");
+      el.innerHTML =
+        '<span class="toast-icon">' + ICONS[level] + '</span>' +
+        '<div class="toast-body"></div>' +
+        '<button type="button" class="toast-close" aria-label="Dismiss">&times;</button>';
+      el.querySelector(".toast-body").textContent = message;
+      host.appendChild(el);
+      var dismiss = function () {
+        if (el.dataset.leaving) return;
+        el.dataset.leaving = "true";
+        el.addEventListener("animationend", function () { el.remove(); });
+        // Fallback in case animations are disabled.
+        setTimeout(function () { el.remove(); }, 400);
+      };
+      el.querySelector(".toast-close").addEventListener("click", dismiss);
+      setTimeout(dismiss, 4500);
+    };
+
+    function popFlash() {
+      var match = document.cookie.match(/(?:^|;\s*)flash=([^;]*)/);
+      if (!match) return;
+      document.cookie = "flash=; Max-Age=0; path=/";
+      try {
+        var data = JSON.parse(decodeURIComponent(match[1]));
+        window.showToast(data.message, data.level);
+      } catch (e) { /* ignore malformed flash */ }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", popFlash);
+    } else {
+      popFlash();
+    }
+    document.body.addEventListener("htmx:afterSettle", popFlash);
+  })();
+</script>
+
 <script>
   // Keep the sidebar's active item in sync after boosted (AJAX) navigations,
   // since only <main> is swapped and the sidebar itself persists.

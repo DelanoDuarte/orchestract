@@ -1606,6 +1606,54 @@ async def import_version(
     )
 
 
+def _content_disposition_filename(name: str) -> str:
+    """Content-Disposition filenames must be ASCII with no quotes/control
+    chars -- strip anything else so the header can't be broken or injected."""
+    cleaned = "".join(c for c in name if 32 <= ord(c) < 127 and c not in '"\\')
+    return cleaned.strip() or "file"
+
+
+@org_router.get("/contracts/{contract_id}/documents/{document_id}/versions/{version_id}/raw")
+async def document_version_raw(
+    contract_id: int,
+    document_id: int,
+    version_id: int,
+    request: Request,
+    download: bool = False,
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    """Streams a stored file version's bytes for inline preview or download.
+    Scoped to the org (defense in depth) and served with hardening headers so
+    an uploaded HTML/SVG can't run script in our origin: `nosniff` plus a
+    sandbox CSP -- previews additionally render inside a sandboxed iframe."""
+    contract = await contract_service.get(contract_id)
+    document = await document_service.get(document_id)
+    version = next((v for v in document.versions if v.id == version_id), None)
+    if contract.organization_id != organization.id or document.contract_id != contract_id or version is None:
+        raise NotFoundError("file version not found")
+    data = await document_service.download_version(version)
+    disposition = "attachment" if download else "inline"
+    filename = _content_disposition_filename(version.original_filename)
+    return Response(
+        content=data,
+        media_type=version.content_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+            # `default-src 'none'` neutralizes scripts in an uploaded HTML/SVG
+            # even if it's opened directly (not just in the sandboxed iframe);
+            # top-level image/pdf/text still render. frame-ancestors 'self'
+            # keeps it embeddable only by our own preview dialog.
+            "Content-Security-Policy": (
+                "default-src 'none'; img-src 'self' data:; media-src 'self'; "
+                "style-src 'unsafe-inline'; frame-ancestors 'self'"
+            ),
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
 @org_router.post("/contracts/{contract_id}/summarize")
 async def summarize_contract(
     contract_id: int,

@@ -308,6 +308,14 @@ dialog[open] { animation: dialog-in .22s var(--ease-out); }
 @keyframes dialog-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
 dialog::backdrop { background: oklch(0 0 0 / 55%); backdrop-filter: blur(2px); }
 
+/* Roomy document-preview dialog: the ID beats Basecoat's `.dialog > *`
+   width:100% so the panel can be large, and the iframe grows to fill it. */
+#doc-preview-dialog > article {
+  width: min(94vw, 1150px);
+  height: min(90vh, 960px);
+  max-width: none;
+}
+
 /* Alerts: rounded + subtle. */
 .alert { border-radius: var(--radius); }
 

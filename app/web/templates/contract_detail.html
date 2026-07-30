@@ -21,9 +21,11 @@
       {% if contract.description %}<p class="text-sm text-muted-foreground">{{ contract.description }}</p>{% endif %}
     </div>
     {% if ai_enabled %}
-    <form method="post" action="/{{ organization.slug }}/contracts/{{ contract.id }}/summarize">
+    <form method="post" action="/{{ organization.slug }}/contracts/{{ contract.id }}/summarize"
+          class="ai-form" hx-disabled-elt="find button" hx-indicator="this">
       <button type="submit" class="btn" data-variant="outline" data-size="sm">
-        {{ icon('zap', 'size-4') }}<span>Summarize contract</span>
+        <span class="ai-idle inline-flex items-center gap-1.5">{{ icon('zap', 'size-4') }}<span>Summarize contract</span></span>
+        <span class="ai-busy hidden"><span class="spinner"></span><span>Summarizing…</span></span>
       </button>
     </form>
     {% endif %}
@@ -38,6 +40,14 @@
     <p class="eyebrow flex items-center gap-1.5">{{ icon('zap', 'size-3.5') }}AI summary</p>
     <p class="mt-2 text-sm">{{ contract.summary }}</p>
     <p class="mt-2 text-xs text-muted-foreground">Generated {{ contract.summary_generated_at.strftime("%Y-%m-%d %H:%M") }}</p>
+  </div>
+  {% elif ai_unavailable_reason %}
+  <div class="card mb-6 flex items-start gap-3 p-4">
+    <span class="text-muted-foreground">{{ icon('zap-off', 'size-4') }}</span>
+    <div>
+      <p class="eyebrow">AI summary unavailable</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{ ai_unavailable_reason }}</p>
+    </div>
   </div>
   {% endif %}
 
@@ -113,9 +123,11 @@
               <span class="text-muted-foreground">{{ icon('file-text', 'size-4') }}</span>{{ document.name }}
             </h3>
             {% if ai_enabled and document.versions %}
-            <form method="post" action="/{{ organization.slug }}/contracts/{{ contract.id }}/documents/{{ document.id }}/summarize">
+            <form method="post" action="/{{ organization.slug }}/contracts/{{ contract.id }}/documents/{{ document.id }}/summarize"
+                  class="ai-form" hx-disabled-elt="find button" hx-indicator="this">
               <button type="submit" class="btn" data-variant="ghost" data-size="sm">
-                {{ icon('zap', 'size-4') }}<span>Summarize</span>
+                <span class="ai-idle inline-flex items-center gap-1.5">{{ icon('zap', 'size-4') }}<span>Summarize</span></span>
+                <span class="ai-busy hidden"><span class="spinner"></span><span>Summarizing…</span></span>
               </button>
             </form>
             {% endif %}
@@ -221,14 +233,18 @@
       <p class="text-sm text-muted-foreground">Ask it to inspect or drive this contract — it can only do what your role allows.</p>
     </header>
     <section class="flex flex-col gap-4 p-4">
-      <form method="post" action="/{{ organization.slug }}/contracts/{{ contract.id }}/assistant" class="flex flex-col gap-3">
+      <form method="post" action="/{{ organization.slug }}/contracts/{{ contract.id }}/assistant" class="ai-form flex flex-col gap-3"
+            hx-disabled-elt="find button" hx-indicator="this">
         <div role="group" class="field">
           <label for="assistant-instruction">Instruction</label>
           <input id="assistant-instruction" type="text" name="instruction" required
                  placeholder="e.g. Summarize where this contract stands and what's next"
                  value="{{ assistant_instruction or "" }}">
         </div>
-        <button type="submit" class="btn self-start">{{ icon('zap', 'size-4') }}<span>Run</span></button>
+        <button type="submit" class="btn self-start">
+          <span class="ai-idle inline-flex items-center gap-1.5">{{ icon('zap', 'size-4') }}<span>Run</span></span>
+          <span class="ai-busy hidden"><span class="spinner"></span><span>Thinking…</span></span>
+        </button>
       </form>
       {% if assistant_result %}
       <div class="flex flex-col gap-2 rounded-[var(--radius)] border border-border bg-background/40 p-3">
@@ -249,6 +265,15 @@
         {% endif %}
       </div>
       {% endif %}
+    </section>
+  </div>
+  {% elif ai_unavailable_reason %}
+  <div class="card mt-6">
+    <header class="border-b border-border px-4 py-3">
+      <h2 class="section-title inline-flex items-center gap-1.5">{{ icon('zap-off', 'size-4') }}AI Assistant unavailable</h2>
+    </header>
+    <section class="p-4">
+      <p class="text-sm text-muted-foreground">{{ ai_unavailable_reason }}</p>
     </section>
   </div>
   {% endif %}

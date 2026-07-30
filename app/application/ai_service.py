@@ -1,5 +1,6 @@
 from anthropic import beta_async_tool
 from anthropic.lib.tools import ToolError
+from google.genai import types
 
 from app.application.contract_service import ContractService
 from app.application.document_service import DocumentService
@@ -14,9 +15,23 @@ from app.domain.tenancy.models import Organization
 from app.domain.tenancy.plans import PLAN_LIMITS, Plan
 from app.domain.users.models import User
 from app.infrastructure.ai.client import AI_MODEL, ASSISTANT_TOOL_NAMES, ai_enabled, get_anthropic_client
+from app.infrastructure.ai.gemini import (
+    SUMMARIZABLE_MIME_TYPES,
+    build_document_part,
+    gemini_enabled,
+    generate_summary,
+)
 
-_SUMMARIZABLE_CONTENT_TYPES = {"text/plain", "text/markdown"}
 _MAX_ASSISTANT_TURNS = 12
+
+# Gemini (Vertex AI) handles summarization; the multimodal model reads the
+# uploaded files directly, so the prompt just frames the reviewer's goal.
+_SUMMARY_SYSTEM_PROMPT = """You summarize contract documents for a busy contract manager. Be \
+accurate and concise, prefer the document's own wording for key terms, and never invent facts \
+that aren't in the material you're given. Call out obligations, parties, effective/expiry dates, \
+amounts, and anything unusual. If a document is unreadable or empty, say so plainly. Keep every \
+summary to at most 8 lines of plain prose (roughly 6-8 short sentences): write a single tight \
+paragraph with no bullet points, headings, or markdown, and don't pad it out to reach the limit."""
 
 _ASSISTANT_SYSTEM_PROMPT = """You are an assistant that helps manage a single contract moving \
 through a workflow. Use get_contract_state first to see its current step, available actions, \
@@ -56,15 +71,47 @@ class AIService:
         what the org's plan allows); `ai_config["enabled"] is False` is a
         per-contract escape hatch for cases too sensitive for AI regardless
         of plan."""
-        if not ai_enabled() or not PLAN_LIMITS[Plan(organization.plan)].ai_enabled:
+        if not PLAN_LIMITS[Plan(organization.plan)].ai_enabled:
+            return False
+        if not (gemini_enabled() or ai_enabled()):
             return False
         return contract.ai_config.get("enabled") is not False
 
+    def unavailable_reason(self, organization: Organization, contract: Contract) -> str | None:
+        """Human-readable explanation of *why* AI is off for this contract, or
+        None when it's available. Mirrors `is_available`'s gates in the same
+        order so the UI can tell the user why the AI controls are hidden instead
+        of just showing nothing."""
+        plan = PLAN_LIMITS[Plan(organization.plan)]
+        if not plan.ai_enabled:
+            return (
+                f"AI features aren't included in the {plan.display_name} plan. "
+                "Upgrade to Team or Business to enable contract summaries and the assistant."
+            )
+        if not (gemini_enabled() or ai_enabled()):
+            return "AI isn't set up on this server yet. Contact your administrator to enable it."
+        if contract.ai_config.get("enabled") is False:
+            return "AI has been turned off for this contract in its AI settings below."
+        return None
+
     def _require_enabled(self, organization: Organization, contract: Contract) -> None:
+        """Plan/contract gate shared by every capability. Provider-specific
+        checks (Gemini for summaries, Anthropic for the assistant) live in the
+        methods themselves so each can report exactly what's missing."""
         if not self.is_available(organization, contract):
             raise AIUnavailableError()
 
+    def _require_summaries(self, organization: Organization, contract: Contract) -> None:
+        self._require_enabled(organization, contract)
+        if not gemini_enabled():
+            raise AIUnavailableError(
+                "Summarization isn't configured -- set GOOGLE_GENAI_USE_VERTEXAI=true and "
+                "GOOGLE_CLOUD_PROJECT (Vertex AI via ADC) to enable it"
+            )
+
     def _resolve_model(self, contract: Contract) -> str:
+        # Assistant only: the per-contract override is validated against the
+        # Anthropic model list. Summaries run on the Gemini model instead.
         return contract.ai_config.get("model") or AI_MODEL
 
     def _append_instructions(self, prompt: str, contract: Contract) -> str:
@@ -73,58 +120,56 @@ class AIService:
             return prompt
         return f"{prompt}\n\nAdditional instructions for this contract: {instructions}"
 
-    async def _complete(self, prompt: str, model: str) -> str:
-        client = get_anthropic_client()
-        response = await client.messages.create(
-            model=model,
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return next((block.text for block in response.content if block.type == "text"), "").strip()
-
     async def summarize_document(self, document_id: int, organization: Organization) -> Document:
         document = await self._document_service.get(document_id)
         contract = await self._contract_service.get(document.contract_id)
-        self._require_enabled(organization, contract)
+        self._require_summaries(organization, contract)
         version = document.latest_version()
         if version is None:
             raise NoVersionsError()
-        if version.content_type not in _SUMMARIZABLE_CONTENT_TYPES:
+        if version.content_type not in SUMMARIZABLE_MIME_TYPES:
             raise UnsupportedContentTypeError(version.content_type)
         content = await self._document_service.download_version(version)
-        text = content.decode("utf-8", errors="replace")
+        part = build_document_part(content, version.content_type, document.name)
         prompt = self._append_instructions(
-            "Summarize this document in 3-5 sentences for someone managing the contract it "
-            f"belongs to.\n\nDocument: {document.name}\n\n{text}",
+            f"Summarize the attached document '{document.name}' for someone managing the contract "
+            "it belongs to. Ground the summary in the document's actual contents, and keep it to "
+            "at most 8 lines.",
             contract,
         )
-        summary = await self._complete(prompt, self._resolve_model(contract))
+        summary = await generate_summary([part, prompt], _SUMMARY_SYSTEM_PROMPT)
         return await self._document_service.set_summary(document_id, summary)
 
     async def summarize_contract(self, contract_id: int, organization: Organization) -> Contract:
         contract = await self._contract_service.get(contract_id)
-        self._require_enabled(organization, contract)
+        self._require_summaries(organization, contract)
         instance = await self._contract_service.get_instance(contract_id)
-        sections = [
-            f"Contract: {contract.title} ({contract.contract_type})",
-            f"Description: {contract.description or 'none'}",
+        contents: list[types.Part | str] = [
+            "Contract metadata:\n"
+            f"Title: {contract.title} ({contract.contract_type})\n"
+            f"Description: {contract.description or 'none'}\n"
             f"Workflow status: {instance.status.value}, current step: {instance.current_step_key}",
         ]
         for document in contract.documents:
             version = document.latest_version()
             if version is None:
-                sections.append(f"Document '{document.name}': no versions uploaded yet.")
-            elif version.content_type not in _SUMMARIZABLE_CONTENT_TYPES:
-                sections.append(f"Document '{document.name}': [{version.content_type}, skipped for now]")
+                contents.append(f"Document '{document.name}': no versions uploaded yet.")
+            elif version.content_type not in SUMMARIZABLE_MIME_TYPES:
+                contents.append(f"Document '{document.name}': [{version.content_type}, not summarizable]")
             else:
                 content = await self._document_service.download_version(version)
-                sections.append(f"Document '{document.name}':\n{content.decode('utf-8', errors='replace')}")
+                contents.append(f"Document '{document.name}':")
+                contents.append(build_document_part(content, version.content_type, document.name))
         prompt = self._append_instructions(
-            "Summarize this contract in a short paragraph for someone managing it -- cover its "
-            "purpose, current status, and any notable terms from its documents:\n\n" + "\n\n".join(sections),
+            "Using the contract metadata and the attached documents above, summarize this contract "
+            "for someone managing it. Base the summary on the actual document contents, not just "
+            "the metadata: cover its purpose, current status, and the notable terms found in the "
+            "documents (parties, effective/expiry dates, amounts, obligations, and anything "
+            "unusual). Keep it to at most 8 lines.",
             contract,
         )
-        summary = await self._complete(prompt, self._resolve_model(contract))
+        contents.append(prompt)
+        summary = await generate_summary(contents, _SUMMARY_SYSTEM_PROMPT)
         return await self._contract_service.set_summary(contract_id, summary)
 
     async def run_assistant(
@@ -132,6 +177,10 @@ class AIService:
     ) -> dict:
         contract = await self._contract_service.get(contract_id)
         self._require_enabled(organization, contract)
+        if not ai_enabled():
+            raise AIUnavailableError(
+                "The AI assistant isn't configured -- set ANTHROPIC_API_KEY to enable it"
+            )
         client = get_anthropic_client()
         actor = f"AI Assistant (on behalf of {current_user.name})"
         allowed_tools = contract.ai_config.get("allowed_tools")

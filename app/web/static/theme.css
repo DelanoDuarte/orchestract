@@ -265,6 +265,21 @@ body {
 }
 .btn:not([data-variant]):hover { box-shadow: var(--shadow-sm); }
 
+/* Inline spinner + "AI busy" swap. hx-boost adds `.htmx-request` to a form
+   while its submit is in flight (e.g. the seconds-long call to Gemini for a
+   summary), so a form marked `.ai-form` shows its `.ai-busy` label and hides
+   `.ai-idle` for the duration -- giving the user a clear "the AI is working"
+   signal without any custom JS. */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block; width: 0.9em; height: 0.9em; border: 2px solid currentColor;
+  border-right-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite;
+  vertical-align: -0.15em; flex: none;
+}
+.ai-busy { display: none; }
+.ai-form.htmx-request .ai-idle { display: none; }
+.ai-form.htmx-request .ai-busy { display: inline-flex; align-items: center; gap: 0.375rem; }
+
 /* Badges: pill radius + medium weight. */
 .badge { border-radius: 999px; font-weight: 550; }
 .badge-success { border-color: transparent; background: color-mix(in oklch, var(--success) 18%, transparent); color: var(--success); }

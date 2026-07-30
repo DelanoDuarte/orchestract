@@ -61,6 +61,21 @@ OAUTH_PROVIDER_LABELS = {StorageProvider.GOOGLE_DRIVE: "Google Drive", StoragePr
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.globals["icon"] = icon
 templates.env.globals["step_icon"] = step_icon_name
+
+
+def _asset_version() -> str:
+    """Cache-busting token for our own static assets: the newest mtime across
+    app/web/static. Appended as ?v= so a browser always refetches theme.css
+    after an edit instead of serving a stale copy (which otherwise makes CSS
+    changes silently "not apply")."""
+    static_dir = Path(__file__).parent / "static"
+    try:
+        return str(int(max(f.stat().st_mtime for f in static_dir.rglob("*") if f.is_file())))
+    except ValueError:
+        return "0"
+
+
+templates.env.globals["asset_version"] = _asset_version()
 templates.env.globals["current_user"] = current_user_for_template
 templates.env.globals["current_role"] = current_role_for_template
 templates.env.globals["terms_version"] = CURRENT_TERMS_VERSION
@@ -1462,6 +1477,7 @@ async def _contract_detail_context(organization: Organization, contract_id: int,
         "can_edit": can_edit,
         "edit_role_names": [role.name for role in edit_roles],
         "ai_enabled": ai_service.is_available(organization, contract),
+        "ai_unavailable_reason": ai_service.unavailable_reason(organization, contract),
         "ai_supported_models": SUPPORTED_AI_MODELS,
         "ai_tool_names": ASSISTANT_TOOL_NAMES,
         "active_nav": "contracts",

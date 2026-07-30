@@ -46,8 +46,28 @@ def _org(plan: Plan = Plan.BUSINESS) -> Organization:
     return Organization(plan=plan.value)
 
 
-def test_summarize_document_requires_an_api_key(monkeypatch):
+def _enable_gemini(monkeypatch):
+    """Configure the Vertex-AI-via-ADC env that gemini_enabled() checks."""
+    monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "true")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-project")
+
+
+def test_summarize_document_requires_a_configured_provider(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_GENAI_USE_VERTEXAI", raising=False)
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    document = Document.create(name="MSA")
+    service = _service_for(document)
+
+    with pytest.raises(AIUnavailableError):
+        asyncio.run(service.summarize_document(1, _org()))
+
+
+def test_summarize_document_requires_gemini_configured(monkeypatch):
+    # Anthropic (assistant) alone doesn't enable summaries -- those need Gemini.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.delenv("GOOGLE_GENAI_USE_VERTEXAI", raising=False)
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
     document = Document.create(name="MSA")
     service = _service_for(document)
 
@@ -56,7 +76,7 @@ def test_summarize_document_requires_an_api_key(monkeypatch):
 
 
 def test_summarize_document_requires_a_plan_with_ai_enabled(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    _enable_gemini(monkeypatch)
     document = Document.create(name="MSA")
     service = _service_for(document)
 
@@ -65,7 +85,7 @@ def test_summarize_document_requires_a_plan_with_ai_enabled(monkeypatch):
 
 
 def test_summarize_document_rejects_a_document_with_no_versions(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    _enable_gemini(monkeypatch)
     document = Document.create(name="MSA")
     service = _service_for(document)
 
@@ -74,13 +94,13 @@ def test_summarize_document_rejects_a_document_with_no_versions(monkeypatch):
 
 
 def test_summarize_document_rejects_unsupported_content_types(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    _enable_gemini(monkeypatch)
     document = Document.create(name="MSA")
     document.add_version(
         storage_connection_id=1,
-        storage_key="org-1/contract-1/doc-1/v1-msa.pdf",
-        original_filename="msa.pdf",
-        content_type="application/pdf",
+        storage_key="org-1/contract-1/doc-1/v1-msa.zip",
+        original_filename="msa.zip",
+        content_type="application/zip",
         size_bytes=1024,
         uploaded_by="alice",
     )
@@ -114,50 +134,46 @@ def test_is_available_defaults_to_org_plan_when_config_absent(monkeypatch):
     assert not service.is_available(_org(Plan.FREE), _contract())
 
 
-def test_summarize_document_uses_contract_model_override(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+def test_summarize_document_sends_the_uploaded_file_to_gemini(monkeypatch):
+    _enable_gemini(monkeypatch)
     document = Document.create(name="MSA")
     document.add_version(
         storage_connection_id=1,
-        storage_key="org-1/contract-1/doc-1/v1-msa.txt",
-        original_filename="msa.txt",
-        content_type="text/plain",
-        size_bytes=10,
+        storage_key="org-1/contract-1/doc-1/v1-msa.pdf",
+        original_filename="msa.pdf",
+        content_type="application/pdf",
+        size_bytes=13,
         uploaded_by="alice",
     )
-    contract = _contract(ai_config={"model": "claude-haiku-4-5"})
+    contract = _contract(ai_config={"instructions": "Flag any auto-renewal."})
     service = _service_for(document, contract)
 
     captured = {}
 
-    class _FakeBlock:
-        type = "text"
-        text = "a summary"
-
-    class _FakeResponse:
-        content = [_FakeBlock()]
-
-    class _FakeMessages:
-        async def create(self, **kwargs):
-            captured.update(kwargs)
-            return _FakeResponse()
-
-    class _FakeClient:
-        messages = _FakeMessages()
+    async def _fake_generate_summary(contents, system_instruction):
+        captured["contents"] = contents
+        captured["system_instruction"] = system_instruction
+        return "a summary"
 
     class _FakeDocumentServiceWithDownload(_FakeDocumentService):
         async def download_version(self, version):
-            return b"contents"
+            return b"%PDF-1.4 fake"
 
         async def set_summary(self, document_id, summary):
+            captured["summary"] = summary
             return document
 
     service._document_service = _FakeDocumentServiceWithDownload(document)
-    monkeypatch.setattr("app.application.ai_service.get_anthropic_client", lambda: _FakeClient())
+    monkeypatch.setattr("app.application.ai_service.generate_summary", _fake_generate_summary)
 
     asyncio.run(service.summarize_document(1, _org()))
 
-    assert captured["model"] == "claude-haiku-4-5"
+    part, prompt = captured["contents"]
+    assert part.inline_data.mime_type == "application/pdf"
+    assert part.inline_data.data == b"%PDF-1.4 fake"
+    # Per-contract instructions ride along in the prompt.
+    assert "Flag any auto-renewal." in prompt
+    assert captured["summary"] == "a summary"
 
 
 class _FakeToolRunner:
@@ -210,3 +226,38 @@ def test_run_assistant_restricts_tools_and_resolves_model_from_contract_config(m
     kwargs = fake_client.beta.messages.last_kwargs
     assert kwargs["model"] == "claude-sonnet-5"
     assert [t.name for t in kwargs["tools"]] == ["get_contract_state"]
+
+
+def _docx_bytes() -> bytes:
+    import io
+
+    from docx import Document as DocxDocument
+
+    doc = DocxDocument()
+    doc.add_paragraph("Acme Corp and Damian LLC agree as follows.")
+    table = doc.add_table(rows=1, cols=2)
+    table.rows[0].cells[0].text = "Fee"
+    table.rows[0].cells[1].text = "USD 10,000/mo"
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def test_build_document_part_extracts_docx_text_instead_of_inlining():
+    from app.infrastructure.ai.gemini import DOCX_MIME, SUMMARIZABLE_MIME_TYPES, build_document_part
+
+    # .docx is summarizable but can't be sent to Gemini inline -- it's converted
+    # to text, so the part is a str carrying the paragraphs and table cells.
+    assert DOCX_MIME in SUMMARIZABLE_MIME_TYPES
+    part = build_document_part(_docx_bytes(), DOCX_MIME, "MSA.docx")
+    assert isinstance(part, str)
+    assert "Acme Corp and Damian LLC" in part
+    assert "Fee | USD 10,000/mo" in part
+
+
+def test_build_document_part_inlines_native_media():
+    from app.infrastructure.ai.gemini import build_document_part
+
+    part = build_document_part(b"%PDF-1.4 fake", "application/pdf", "x.pdf")
+    assert part.inline_data.mime_type == "application/pdf"
+    assert part.inline_data.data == b"%PDF-1.4 fake"

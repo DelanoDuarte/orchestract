@@ -24,7 +24,11 @@
         {% endif %}
       </div>
       {% if organization.stripe_customer_id %}
-      <form method="post" action="/{{ organization.slug }}/settings/billing/portal">
+      <!-- hx-boost="false": this POST redirects (303) to Stripe's external
+           billing portal. A boosted/AJAX submit would try to follow that
+           cross-origin redirect inside XHR and get blocked by CORS, so it must
+           be a full-page navigation. -->
+      <form method="post" action="/{{ organization.slug }}/settings/billing/portal" hx-boost="false">
         <button type="submit" class="btn" data-variant="outline" data-size="sm">Manage billing</button>
       </form>
       {% endif %}
@@ -66,7 +70,10 @@
       {% if is_current %}
       <span class="badge badge-primary mt-auto self-start">Current plan</span>
       {% elif plan.value != "free" %}
-      <form method="post" action="/{{ organization.slug }}/settings/billing/checkout" class="mt-auto">
+      <!-- hx-boost="false": redirects (303) to Stripe Checkout on another
+           origin; a boosted XHR submit can't follow a cross-origin redirect
+           (CORS), so force a full-page navigation. -->
+      <form method="post" action="/{{ organization.slug }}/settings/billing/checkout" class="mt-auto" hx-boost="false">
         <input type="hidden" name="plan" value="{{ plan.value }}">
         <button type="submit" class="btn w-full" data-size="sm" {{ "disabled" if not billing_enabled }}>
           Upgrade to {{ limits.display_name }}

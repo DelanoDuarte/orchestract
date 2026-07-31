@@ -105,8 +105,8 @@ class AIService:
         self._require_enabled(organization, contract)
         if not gemini_enabled():
             raise AIUnavailableError(
-                "Summarization isn't configured -- set GOOGLE_GENAI_USE_VERTEXAI=true and "
-                "GOOGLE_CLOUD_PROJECT (Vertex AI via ADC) to enable it"
+                "Summarization isn't configured -- set GOOGLE_API_KEY (Gemini Developer API) or, "
+                "for Vertex AI, GOOGLE_GENAI_USE_VERTEXAI=true with GOOGLE_CLOUD_PROJECT (via ADC)"
             )
 
     def _resolve_model(self, contract: Contract) -> str:

@@ -65,25 +65,38 @@ def _use_vertexai() -> bool:
     return os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").strip().lower() in {"1", "true", "yes"}
 
 
-def gemini_enabled() -> bool:
-    """True when the process is configured to reach Vertex AI via ADC.
+def _api_key() -> str | None:
+    # Gemini Developer API (AI Studio) key. GOOGLE_API_KEY is the SDK's own
+    # convention; GEMINI_API_KEY is accepted as a common alias.
+    return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
-    We deliberately don't look at ADC credentials themselves here (google-auth
-    resolves those lazily at call time from the environment/metadata server);
-    we only require the Vertex opt-in and a project so a half-configured
-    environment surfaces a clear "not configured" error instead of a cryptic
-    auth failure deep in the SDK.
+
+def gemini_enabled() -> bool:
+    """True when summarization can reach a Gemini backend. Two options:
+
+    * Developer API (AI Studio): a single GOOGLE_API_KEY / GEMINI_API_KEY --
+      the simplest to run on non-GCP hosts (e.g. Railway), no service account.
+    * Vertex AI via ADC: the Vertex opt-in plus a project. We don't inspect ADC
+      credentials here (google-auth resolves those lazily at call time), so a
+      half-configured Vertex environment still surfaces a clear "not configured"
+      error rather than a cryptic auth failure deep in the SDK.
     """
+    if _api_key():
+        return True
     return _use_vertexai() and bool(os.environ.get("GOOGLE_CLOUD_PROJECT"))
 
 
 @lru_cache
 def get_gemini_client() -> genai.Client:
-    # No project/location/credentials threaded through here on purpose: with
-    # GOOGLE_GENAI_USE_VERTEXAI=true the SDK reads GOOGLE_CLOUD_PROJECT /
+    # Vertex opt-in wins when set: the SDK reads GOOGLE_CLOUD_PROJECT /
     # GOOGLE_CLOUD_LOCATION and authenticates via Application Default
     # Credentials, so there's no key in app config to log or leak.
-    return genai.Client(http_options=HttpOptions(api_version="v1"), vertexai=True)
+    if _use_vertexai():
+        return genai.Client(http_options=HttpOptions(api_version="v1"), vertexai=True)
+    # Otherwise use the Developer API with an explicit key (no ADC, no service
+    # account) -- passed in rather than left to the SDK's env lookup so the
+    # GEMINI_API_KEY alias works too.
+    return genai.Client(api_key=_api_key())
 
 
 async def generate_summary(contents: list[types.Part | str], system_instruction: str) -> str:

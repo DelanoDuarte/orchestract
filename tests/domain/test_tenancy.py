@@ -1,5 +1,5 @@
 from app.domain.tenancy.models import Organization
-from app.domain.tenancy.plans import Plan
+from app.domain.tenancy.plans import PLAN_LIMITS, Plan
 
 
 def test_organization_defaults_to_free_plan():
@@ -36,3 +36,23 @@ def test_clear_subscription_reverts_to_free():
     assert organization.stripe_subscription_id is None
     # the Stripe customer id is kept -- the same customer may resubscribe later
     assert organization.stripe_customer_id == "cus_123"
+
+
+def test_can_add_user_respects_the_plan_ceiling():
+    free = PLAN_LIMITS[Plan.FREE]  # max_users=3
+    assert free.can_add_user(2) is True
+    assert free.can_add_user(3) is False  # at the ceiling -> button becomes "Upgrade"
+    assert free.can_add_user(4) is False
+
+
+def test_can_add_contract_respects_the_plan_ceiling():
+    free = PLAN_LIMITS[Plan.FREE]  # max_contracts=5
+    assert free.can_add_contract(4) is True
+    assert free.can_add_contract(5) is False
+    assert free.can_add_contract(6) is False
+
+
+def test_unlimited_plan_always_allows_more():
+    business = PLAN_LIMITS[Plan.BUSINESS]  # max_users/max_contracts = None
+    assert business.can_add_user(10_000) is True
+    assert business.can_add_contract(10_000) is True

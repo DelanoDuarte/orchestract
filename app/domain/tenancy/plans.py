@@ -16,6 +16,17 @@ class PlanLimits:
     max_contracts: int | None
     ai_enabled: bool
 
+    def can_add_user(self, current_count: int) -> bool:
+        """Whether another user fits under this plan (None == unlimited).
+        Mirrors the server-side guard in UserService.create_user so the UI
+        can gate the 'New user' button before the form is even submitted."""
+        return self.max_users is None or current_count < self.max_users
+
+    def can_add_contract(self, current_count: int) -> bool:
+        """Whether another contract fits under this plan (None == unlimited).
+        Mirrors ContractService.create_contract's guard."""
+        return self.max_contracts is None or current_count < self.max_contracts
+
 
 PLAN_LIMITS: dict[Plan, PlanLimits] = {
     Plan.FREE: PlanLimits(

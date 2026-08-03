@@ -41,6 +41,14 @@ class InvalidOrExpiredTokenError(DomainError):
         super().__init__("this link is invalid or has expired")
 
 
+class SocialLoginError(DomainError):
+    """A social (e.g. Google) sign-in couldn't be completed -- unverified
+    provider email, a deactivated account, or missing profile data."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
 class PermissionDeniedError(DomainError):
     def __init__(self, message: str = "you do not have permission to perform this action") -> None:
         super().__init__(message)

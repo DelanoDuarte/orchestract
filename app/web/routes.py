@@ -1,7 +1,9 @@
 import json
+import secrets
 import urllib.parse
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Depends, Form, Request, Response, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -22,6 +24,7 @@ from app.api.deps import (
     organization_service,
     registration_service,
     role_service,
+    social_auth_service,
     storage_service,
     user_service,
     workflow_service,
@@ -40,8 +43,10 @@ from app.domain.users.exceptions import (
     InvalidCredentialsError,
     InvalidOrExpiredTokenError,
     PermissionDeniedError,
+    SocialLoginError,
 )
 from app.domain.users.models import User
+from app.infrastructure.auth.google_oidc import build_google_oauth_client, google_login_enabled
 from app.domain.workflow.models import WorkflowDefinition, WorkflowStatus
 from app.infrastructure.ai.client import ASSISTANT_TOOL_NAMES, SUPPORTED_AI_MODELS
 from app.infrastructure.billing.stripe_client import (
@@ -80,6 +85,9 @@ templates.env.globals["current_user"] = current_user_for_template
 templates.env.globals["current_role"] = current_role_for_template
 templates.env.globals["terms_version"] = CURRENT_TERMS_VERSION
 templates.env.globals["terms_effective_date"] = TERMS_EFFECTIVE_DATE
+# Whether to render the "Continue with Google" button. Evaluated once at import
+# (settings are static per process), mirroring asset_version above.
+templates.env.globals["google_configured"] = google_login_enabled()
 
 root_router = APIRouter()
 org_router = APIRouter(prefix="/{org_slug}", dependencies=[Depends(enforce_login_and_membership)])
@@ -241,8 +249,8 @@ async def oauth_callback(provider: StorageProvider, request: Request, code: str,
 
 
 @root_router.get("/login")
-async def login_page(request: Request, next: str = "/"):
-    return templates.TemplateResponse(request, "login.html", {"next": next})
+async def login_page(request: Request, next: str = "/", error: str = ""):
+    return templates.TemplateResponse(request, "login.html", {"next": next, "error": error})
 
 
 @root_router.post("/login")
@@ -297,6 +305,61 @@ def _session_response(redirect_to: str, session_token: str) -> RedirectResponse:
         secure=get_settings().session_cookie_secure,
         max_age=60 * 60 * 24 * 14,
     )
+    return response
+
+
+_OAUTH_STATE_COOKIE = "g_oauth_state"
+_OAUTH_NEXT_COOKIE = "g_oauth_next"
+
+
+@root_router.get("/auth/google/login")
+async def google_login(request: Request, next: str = "/"):
+    """Kick off Google sign-in: stash a CSRF state (and the post-login
+    destination) in short-lived cookies, then redirect to Google's consent
+    screen. samesite=lax so the state cookie survives the top-level GET
+    navigation back to /auth/google/callback."""
+    if not google_login_enabled():
+        return RedirectResponse("/login?error=Google+sign-in+isn%27t+configured.", status_code=303)
+    state = secrets.token_urlsafe(32)
+    secure = get_settings().session_cookie_secure
+    response = RedirectResponse(build_google_oauth_client().authorization_url(state), status_code=303)
+    for name, value in ((_OAUTH_STATE_COOKIE, state), (_OAUTH_NEXT_COOKIE, next)):
+        response.set_cookie(name, value, max_age=600, httponly=True, samesite="lax", secure=secure)
+    return response
+
+
+def _google_login_failed(message: str) -> RedirectResponse:
+    response = RedirectResponse(f"/login?error={urllib.parse.quote(message)}", status_code=303)
+    response.delete_cookie(_OAUTH_STATE_COOKIE)
+    response.delete_cookie(_OAUTH_NEXT_COOKIE)
+    return response
+
+
+@root_router.get("/auth/google/callback")
+async def google_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    cookie_state = request.cookies.get(_OAUTH_STATE_COOKIE)
+    next_path = request.cookies.get(_OAUTH_NEXT_COOKIE, "/")
+    if error or not code:
+        return _google_login_failed("Google sign-in was cancelled.")
+    # Double-submit CSRF: the state in the redirect must match the cookie we set.
+    if not state or not cookie_state or not secrets.compare_digest(state, cookie_state):
+        return _google_login_failed("Your sign-in session expired. Please try again.")
+    try:
+        identity = await build_google_oauth_client().exchange_code(code)
+        ip_address, user_agent = _client_metadata(request)
+        user = await social_auth_service.login_or_register_google(
+            identity, CURRENT_TERMS_VERSION, ip_address, user_agent
+        )
+    except SocialLoginError as exc:
+        return _google_login_failed(str(exc))
+    except (httpx.HTTPError, KeyError):
+        return _google_login_failed("Couldn't complete Google sign-in. Please try again.")
+    session = await user_service.create_session(user.id)
+    organization = await organization_service.get(user.organization_id)
+    redirect_to = next_path if next_path.startswith(f"/{organization.slug}/") else f"/{organization.slug}/"
+    response = _session_response(redirect_to, session.token)
+    response.delete_cookie(_OAUTH_STATE_COOKIE)
+    response.delete_cookie(_OAUTH_NEXT_COOKIE)
     return response
 
 
@@ -830,10 +893,17 @@ async def users_page(
     users = await user_service.list_users(organization.id)
     roles = await role_service.list_roles(organization.id)
     role_names = {role.id: role.name for role in roles}
+    can_create_user = PLAN_LIMITS[Plan(organization.plan)].can_add_user(len(users))
     return templates.TemplateResponse(
         request,
         "users.html",
-        {"organization": organization, "users": users, "role_names": role_names, "active_nav": "users"},
+        {
+            "organization": organization,
+            "users": users,
+            "role_names": role_names,
+            "can_create_user": can_create_user,
+            "active_nav": "users",
+        },
     )
 
 
@@ -1385,6 +1455,7 @@ async def contracts_page(
     if contract_type:
         contracts = [c for c in contracts if c.contract_type == contract_type]
     rows = await _contract_rows_with_step_info(organization.id, contracts)
+    can_create_contract = PLAN_LIMITS[Plan(organization.plan)].can_add_contract(len(all_contracts))
     return templates.TemplateResponse(
         request,
         "contracts_list.html",
@@ -1394,6 +1465,7 @@ async def contracts_page(
             "contract_types": contract_types,
             "search_query": q,
             "active_type": contract_type,
+            "can_create_contract": can_create_contract,
             "active_nav": "contracts",
         },
     )

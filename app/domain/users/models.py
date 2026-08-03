@@ -79,7 +79,13 @@ class User(Base):
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     name: Mapped[str] = mapped_column(String(200))
     email: Mapped[str] = mapped_column(String(300))
-    password_hash: Mapped[str] = mapped_column(String(300))
+    # Nullable: users who signed in with a social provider (e.g. Google) have no
+    # password. They authenticate via that provider, or set a password later
+    # through the password-reset flow.
+    password_hash: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Google's stable subject id, set for accounts that have signed in with
+    # Google. Nullable + unique: password-only accounts leave it null.
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, default=None)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     email_verified_at: Mapped[datetime | None] = mapped_column(default=None)
@@ -104,8 +110,41 @@ class User(Base):
             is_active=True,
         )
 
+    @classmethod
+    def create_social(
+        cls, organization_id: int, name: str, email: str, role_id: int, google_sub: str
+    ) -> "User":
+        """A user provisioned via a social provider: no password, and email
+        already verified (the provider asserts a verified address)."""
+        name = name.strip()
+        if not name:
+            raise EmptyUserNameError()
+        email = email.strip().lower()
+        if not email:
+            raise EmptyUserEmailError()
+        return cls(
+            organization_id=organization_id,
+            name=name,
+            email=email,
+            password_hash=None,
+            google_sub=google_sub,
+            role_id=role_id,
+            is_active=True,
+            email_verified_at=utcnow(),
+        )
+
     def verify_password(self, raw_password: str) -> bool:
+        # Social-only accounts have no password hash and can never match.
+        if self.password_hash is None:
+            return False
         return verify_password(raw_password, self.password_hash)
+
+    def link_google(self, google_sub: str) -> None:
+        """Attach a Google identity to an existing account (link-by-email) and
+        treat the address as verified, since Google asserts it."""
+        self.google_sub = google_sub
+        if self.email_verified_at is None:
+            self.email_verified_at = utcnow()
 
     def set_password(self, raw_password: str) -> None:
         self.password_hash = hash_password(raw_password)

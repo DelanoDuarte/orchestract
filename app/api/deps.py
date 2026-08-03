@@ -9,6 +9,7 @@ from app.application.document_service import DocumentService
 from app.application.organization_service import OrganizationService
 from app.application.registration_service import RegistrationService
 from app.application.role_service import RoleService
+from app.application.social_auth_service import SocialAuthService
 from app.application.storage_service import StorageService
 from app.application.user_service import UserService
 from app.application.workflow_service import WorkflowService
@@ -50,6 +51,7 @@ contract_service = ContractService(uow_factory)
 role_service = RoleService(uow_factory)
 user_service = UserService(uow_factory)
 registration_service = RegistrationService(uow_factory)
+social_auth_service = SocialAuthService(uow_factory)
 billing_service = BillingService(uow_factory)
 compliance_service = ComplianceService(uow_factory)
 ai_service = AIService(contract_service, document_service, role_service, workflow_service)

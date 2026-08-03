@@ -46,3 +46,16 @@
   {% if caller %}<div class="mt-2">{{ caller() }}</div>{% endif %}
 </div>
 {% endmacro %}
+
+{# The primary "create" call-to-action, or an "Upgrade plan" button pointing at
+   billing when the org's plan is out of room. Keeps the plan gate consistent
+   across every resource list (contracts, users, ...) and mirrors the
+   server-side PlanLimitExceededError guard so users never hit a dead form. #}
+{% macro create_or_upgrade(can_create, org_slug, new_href, new_label, noun, size=None) %}
+  {% if can_create %}
+  <a href="{{ new_href }}" class="btn"{% if size %} data-size="{{ size }}"{% endif %}>{{ icon('plus', 'size-4') }}<span>{{ new_label }}</span></a>
+  {% else %}
+  <a href="/{{ org_slug }}/settings/billing" class="btn" data-variant="outline"{% if size %} data-size="{{ size }}"{% endif %}
+     title="You've reached your plan's {{ noun }} limit — upgrade to add more.">{{ icon('zap', 'size-4') }}<span>Upgrade plan</span></a>
+  {% endif %}
+{% endmacro %}

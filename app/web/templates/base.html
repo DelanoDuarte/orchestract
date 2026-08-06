@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="{{ current_locale() }}" class="dark">
 <head>
 <script>
   (function () {
@@ -61,51 +61,51 @@
       </header>
       <section class="scrollbar-sm px-2">
         <div role="group" aria-labelledby="group-label-workspace">
-          <h3 id="group-label-workspace">Workspace</h3>
+          <h3 id="group-label-workspace">{{ _("Workspace") }}</h3>
           <ul>
             <li>
               <a href="/{{ organization.slug }}/" data-nav="dashboard" {% if active_nav == "dashboard" %}aria-current="page"{% endif %}>
-                {{ icon('layout-dashboard', 'size-4') }}<span>Dashboard</span>
+                {{ icon('layout-dashboard', 'size-4') }}<span>{{ _("Dashboard") }}</span>
               </a>
             </li>
             <li>
               <a href="/{{ organization.slug }}/contracts" data-nav="contracts" {% if active_nav == "contracts" %}aria-current="page"{% endif %}>
-                {{ icon('file-text', 'size-4') }}<span>Contracts</span>
+                {{ icon('file-text', 'size-4') }}<span>{{ _("Contracts") }}</span>
               </a>
             </li>
             <li>
               <a href="/{{ organization.slug }}/workflows" data-nav="workflows" {% if active_nav == "workflows" %}aria-current="page"{% endif %}>
-                {{ icon('git-branch', 'size-4') }}<span>Workflows</span>
+                {{ icon('git-branch', 'size-4') }}<span>{{ _("Workflows") }}</span>
               </a>
             </li>
             <li>
               <a href="/{{ organization.slug }}/agents" data-nav="agents" {% if active_nav == "agents" %}aria-current="page"{% endif %}>
-                {{ icon('users', 'size-4') }}<span>Agents</span>
+                {{ icon('users', 'size-4') }}<span>{{ _("Agents") }}</span>
               </a>
             </li>
           </ul>
         </div>
         <div role="group" aria-labelledby="group-label-admin">
-          <h3 id="group-label-admin">Administration</h3>
+          <h3 id="group-label-admin">{{ _("Administration") }}</h3>
           <ul>
             <li>
               <a href="/{{ organization.slug }}/roles" data-nav="roles" {% if active_nav == "roles" %}aria-current="page"{% endif %}>
-                {{ icon('shield', 'size-4') }}<span>Roles</span>
+                {{ icon('shield', 'size-4') }}<span>{{ _("Roles") }}</span>
               </a>
             </li>
             <li>
               <a href="/{{ organization.slug }}/users" data-nav="users" {% if active_nav == "users" %}aria-current="page"{% endif %}>
-                {{ icon('user-plus', 'size-4') }}<span>Users</span>
+                {{ icon('user-plus', 'size-4') }}<span>{{ _("Users") }}</span>
               </a>
             </li>
             <li>
               <a href="/{{ organization.slug }}/settings/storage" data-nav="storage" {% if active_nav == "storage" %}aria-current="page"{% endif %}>
-                {{ icon('package', 'size-4') }}<span>Storage</span>
+                {{ icon('package', 'size-4') }}<span>{{ _("Storage") }}</span>
               </a>
             </li>
             <li>
               <a href="/{{ organization.slug }}/settings/billing" data-nav="billing" {% if active_nav == "billing" %}aria-current="page"{% endif %}>
-                {{ icon('credit-card', 'size-4') }}<span>Billing</span>
+                {{ icon('credit-card', 'size-4') }}<span>{{ _("Billing") }}</span>
               </a>
             </li>
           </ul>
@@ -155,18 +155,19 @@
       {% endif %}
       <div class="flex items-center gap-1.5">
         {% if not organization %}
-        <a href="/pricing" class="btn" data-variant="ghost" data-size="sm">Pricing</a>
-        <a href="/login" class="btn" data-variant="ghost" data-size="sm" hx-boost="false">Log in</a>
-        <a href="/signup" class="btn" data-size="sm" hx-boost="false">Sign up</a>
+        <a href="/pricing" class="btn" data-variant="ghost" data-size="sm">{{ _("Pricing") }}</a>
+        <a href="/login" class="btn" data-variant="ghost" data-size="sm" hx-boost="false">{{ _("Log in") }}</a>
+        <a href="/signup" class="btn" data-size="sm" hx-boost="false">{{ _("Sign up") }}</a>
         {% endif %}
-        <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="Toggle theme"
+        {% include "_language_switcher.html" %}
+        <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="{{ _('Toggle theme') }}"
                 hx-boost="false" onclick="window.basecoat.theme.toggle()">
           <span class="hidden dark:block">{{ icon('sun', 'size-4') }}</span>
           <span class="block dark:hidden">{{ icon('moon', 'size-4') }}</span>
         </button>
         {% if organization %}
         <form method="post" action="/logout" hx-boost="false">
-          <button type="submit" class="btn" data-variant="ghost" data-size="icon" aria-label="Log out">
+          <button type="submit" class="btn" data-variant="ghost" data-size="icon" aria-label="{{ _('Log out') }}">
             {{ icon('log-out', 'size-4') }}
           </button>
         </form>
@@ -186,11 +187,11 @@
           <img src="/static/logos/orchestract-lockup-light.svg" alt="Orchestract" class="h-6 w-auto dark:hidden">
           <img src="/static/logos/orchestract-lockup-dark.svg" alt="Orchestract" class="hidden h-6 w-auto dark:block">
         </a>
-        <p>Contract workflows, orchestrated with AI.</p>
+        <p>{{ _("Contract workflows, orchestrated with AI.") }}</p>
         <div class="flex items-center gap-4">
-          <a href="/pricing" class="hover:text-foreground">Pricing</a>
-          <a href="/terms" class="hover:text-foreground">Terms</a>
-          <a href="/login" class="hover:text-foreground" hx-boost="false">Log in</a>
+          <a href="/pricing" class="hover:text-foreground">{{ _("Pricing") }}</a>
+          <a href="/terms" class="hover:text-foreground">{{ _("Terms") }}</a>
+          <a href="/login" class="hover:text-foreground" hx-boost="false">{{ _("Log in") }}</a>
         </div>
       </div>
     </footer>

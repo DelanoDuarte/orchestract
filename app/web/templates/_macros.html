@@ -56,6 +56,6 @@
   <a href="{{ new_href }}" class="btn"{% if size %} data-size="{{ size }}"{% endif %}>{{ icon('plus', 'size-4') }}<span>{{ new_label }}</span></a>
   {% else %}
   <a href="/{{ org_slug }}/settings/billing" class="btn" data-variant="outline"{% if size %} data-size="{{ size }}"{% endif %}
-     title="You've reached your plan's {{ noun }} limit — upgrade to add more.">{{ icon('zap', 'size-4') }}<span>Upgrade plan</span></a>
+     title="{{ _("You have reached your plan's %(noun)s limit — upgrade to add more.", noun=noun) }}">{{ icon('zap', 'size-4') }}<span>{{ _("Upgrade plan") }}</span></a>
   {% endif %}
 {% endmacro %}

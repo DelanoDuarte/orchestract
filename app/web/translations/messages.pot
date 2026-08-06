@@ -1,0 +1,215 @@
+# Translations template for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-08-03 23:29+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+msgid "/mo"
+msgstr ""
+
+msgid "AI features"
+msgstr ""
+
+msgid "AI features included"
+msgstr ""
+
+msgid "Administration"
+msgstr ""
+
+msgid "Agents"
+msgstr ""
+
+msgid "Already have an account?"
+msgstr ""
+
+msgid "At least 8 characters"
+msgstr ""
+
+msgid "Billing"
+msgstr ""
+
+msgid ""
+"Billing isn't configured yet — an administrator needs to set the Stripe "
+"API keys."
+msgstr ""
+
+msgid "Change language"
+msgstr ""
+
+msgid "Continue with Google"
+msgstr ""
+
+msgid "Contract workflows, orchestrated with AI."
+msgstr ""
+
+msgid "Contracts"
+msgstr ""
+
+msgid "Create account"
+msgstr ""
+
+msgid "Create your organization"
+msgstr ""
+
+msgid "Current plan"
+msgstr ""
+
+msgid "Dashboard"
+msgstr ""
+
+msgid "Don't have an account?"
+msgstr ""
+
+msgid "Email"
+msgstr ""
+
+msgid "Forgot?"
+msgstr ""
+
+msgid "I have read and agree to the"
+msgstr ""
+
+msgid "Included"
+msgstr ""
+
+msgid "Log in"
+msgstr ""
+
+msgid "Log out"
+msgstr ""
+
+msgid "Manage billing"
+msgstr ""
+
+msgid "Manage your subscription plan and usage."
+msgstr ""
+
+msgid "New agent"
+msgstr ""
+
+msgid "New contract"
+msgstr ""
+
+msgid "New user"
+msgstr ""
+
+msgid "New workflow"
+msgstr ""
+
+msgid "No AI features"
+msgstr ""
+
+msgid "Not included"
+msgstr ""
+
+msgid "OR"
+msgstr ""
+
+msgid "Organization name"
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "Pricing"
+msgstr ""
+
+msgid "Resend verification email"
+msgstr ""
+
+msgid "Roles"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Sign in"
+msgstr ""
+
+msgid "Sign in to your Orchestract workspace."
+msgstr ""
+
+msgid "Sign up"
+msgstr ""
+
+msgid "Start free — no credit card required."
+msgstr ""
+
+msgid "Status:"
+msgstr ""
+
+msgid "Storage"
+msgstr ""
+
+msgid "Terms"
+msgstr ""
+
+msgid "Terms & Conditions"
+msgstr ""
+
+msgid "Toggle theme"
+msgstr ""
+
+msgid "Unlimited"
+msgstr ""
+
+msgid "Upgrade plan"
+msgstr ""
+
+#, python-format
+msgid "Upgrade to %(plan)s"
+msgstr ""
+
+msgid "Users"
+msgstr ""
+
+msgid "Welcome back"
+msgstr ""
+
+msgid "Workflows"
+msgstr ""
+
+msgid "Workspace"
+msgstr ""
+
+#, python-format
+msgid "You have reached your plan's %(noun)s limit — upgrade to add more."
+msgstr ""
+
+msgid "Your name"
+msgstr ""
+
+msgid "agent"
+msgstr ""
+
+msgid "contract"
+msgstr ""
+
+msgid "contracts"
+msgstr ""
+
+msgid "including how my organization's documents and contracts are stored."
+msgstr ""
+
+msgid "user"
+msgstr ""
+
+msgid "users"
+msgstr ""
+
+msgid "workflow"
+msgstr ""
+

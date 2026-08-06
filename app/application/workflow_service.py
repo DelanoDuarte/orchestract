@@ -2,6 +2,8 @@ from collections.abc import Callable
 
 from app.domain.shared.exceptions import NotFoundError
 from app.domain.shared.types import slugify
+from app.domain.tenancy.exceptions import PlanLimitExceededError
+from app.domain.tenancy.plans import PLAN_LIMITS, Plan
 from app.domain.workflow.exceptions import DuplicateWorkflowNameError
 from app.domain.workflow.models import WorkflowDefinition
 from app.domain.workflow.validation import find_validation_issues
@@ -16,6 +18,17 @@ class WorkflowService:
         self, organization_id: int, name: str, description: str | None = None
     ) -> WorkflowDefinition:
         async with self._uow_factory() as uow:
+            organization = await uow.organizations.get(organization_id)
+            if organization is None:
+                raise NotFoundError(f"organization {organization_id} not found")
+            limits = PLAN_LIMITS[Plan(organization.plan)]
+            if limits.max_workflows is not None:
+                existing = await uow.workflow_definitions.list_for_organization(organization_id)
+                if len(existing) >= limits.max_workflows:
+                    raise PlanLimitExceededError(
+                        f"the {limits.display_name} plan is limited to {limits.max_workflows} workflows -- "
+                        "upgrade to add more"
+                    )
             definition = WorkflowDefinition.create(organization_id, name, description)
             await uow.workflow_definitions.add(definition)
             await uow.commit()

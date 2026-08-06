@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page reveal">
   {% call macros.page_header("Users", "People who can sign in to this organization.", eyebrow="Administration") %}
-    {{ macros.create_or_upgrade(can_create_user, organization.slug, "/" ~ organization.slug ~ "/users/new", "New user", "user") }}
+    {{ macros.create_or_upgrade(can_create_user, organization.slug, "/" ~ organization.slug ~ "/users/new", _("New user"), _("user")) }}
   {% endcall %}
 
   {% if error %}
@@ -49,7 +49,7 @@
           {% else %}
           <tr><td colspan="5" class="p-0">
             {% call macros.empty_state('user-plus', 'No users yet', 'Invite people to your organization to collaborate on contracts.') %}
-              {{ macros.create_or_upgrade(can_create_user, organization.slug, "/" ~ organization.slug ~ "/users/new", "New user", "user", size="sm") }}
+              {{ macros.create_or_upgrade(can_create_user, organization.slug, "/" ~ organization.slug ~ "/users/new", _("New user"), _("user"), size="sm") }}
             {% endcall %}
           </td></tr>
           {% endfor %}

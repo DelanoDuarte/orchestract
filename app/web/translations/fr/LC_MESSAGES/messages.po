@@ -1,0 +1,215 @@
+# French translations for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-08-03 23:29+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: fr\n"
+"Language-Team: fr <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+msgid "/mo"
+msgstr "/mois"
+
+msgid "AI features"
+msgstr "Fonctions d'IA"
+
+msgid "AI features included"
+msgstr "Fonctions d'IA incluses"
+
+msgid "Administration"
+msgstr "Administration"
+
+msgid "Agents"
+msgstr "Agents"
+
+msgid "Already have an account?"
+msgstr "Vous avez déjà un compte ?"
+
+msgid "At least 8 characters"
+msgstr "Au moins 8 caractères"
+
+msgid "Billing"
+msgstr "Facturation"
+
+msgid "Billing isn't configured yet — an administrator needs to set the Stripe API keys."
+msgstr "La facturation n'est pas encore configurée — un administrateur doit renseigner les clés d'API Stripe."
+
+msgid "Change language"
+msgstr "Changer de langue"
+
+msgid "Continue with Google"
+msgstr "Continuer avec Google"
+
+msgid "Contract workflows, orchestrated with AI."
+msgstr "Des flux de contrats, orchestrés par l'IA."
+
+msgid "Contracts"
+msgstr "Contrats"
+
+msgid "Create account"
+msgstr "Créer un compte"
+
+msgid "Create your organization"
+msgstr "Créez votre organisation"
+
+msgid "Current plan"
+msgstr "Forfait actuel"
+
+msgid "Dashboard"
+msgstr "Tableau de bord"
+
+msgid "Don't have an account?"
+msgstr "Vous n'avez pas de compte ?"
+
+msgid "Email"
+msgstr "E-mail"
+
+msgid "Forgot?"
+msgstr "Oublié ?"
+
+msgid "I have read and agree to the"
+msgstr "J'ai lu et j'accepte les"
+
+msgid "Included"
+msgstr "Inclus"
+
+msgid "Log in"
+msgstr "Se connecter"
+
+msgid "Log out"
+msgstr "Se déconnecter"
+
+msgid "Manage billing"
+msgstr "Gérer la facturation"
+
+msgid "Manage your subscription plan and usage."
+msgstr "Gérez votre forfait d'abonnement et votre utilisation."
+
+msgid "New agent"
+msgstr "Nouvel agent"
+
+msgid "New contract"
+msgstr "Nouveau contrat"
+
+msgid "New user"
+msgstr "Nouvel utilisateur"
+
+msgid "New workflow"
+msgstr "Nouveau flux de travail"
+
+msgid "No AI features"
+msgstr "Aucune fonction d'IA"
+
+msgid "Not included"
+msgstr "Non inclus"
+
+msgid "OR"
+msgstr "OU"
+
+msgid "Organization name"
+msgstr "Nom de l'organisation"
+
+msgid "Password"
+msgstr "Mot de passe"
+
+msgid "Pricing"
+msgstr "Tarifs"
+
+msgid "Resend verification email"
+msgstr "Renvoyer l'e-mail de vérification"
+
+msgid "Roles"
+msgstr "Rôles"
+
+msgid "Settings"
+msgstr "Paramètres"
+
+msgid "Sign in"
+msgstr "Se connecter"
+
+msgid "Sign in to your Orchestract workspace."
+msgstr "Connectez-vous à votre espace Orchestract."
+
+msgid "Sign up"
+msgstr "S'inscrire"
+
+msgid "Start free — no credit card required."
+msgstr "Commencez gratuitement — sans carte bancaire."
+
+msgid "Status:"
+msgstr "Statut :"
+
+msgid "Storage"
+msgstr "Stockage"
+
+msgid "Terms"
+msgstr "Conditions"
+
+msgid "Terms & Conditions"
+msgstr "Conditions générales"
+
+msgid "Toggle theme"
+msgstr "Changer de thème"
+
+msgid "Unlimited"
+msgstr "Illimité"
+
+msgid "Upgrade plan"
+msgstr "Changer de forfait"
+
+#, python-format
+msgid "Upgrade to %(plan)s"
+msgstr "Passer à %(plan)s"
+
+msgid "Users"
+msgstr "Utilisateurs"
+
+msgid "Welcome back"
+msgstr "Bon retour"
+
+msgid "Workflows"
+msgstr "Flux de travail"
+
+msgid "Workspace"
+msgstr "Espace de travail"
+
+#, python-format
+msgid "You have reached your plan's %(noun)s limit — upgrade to add more."
+msgstr "Vous avez atteint la limite de %(noun)s de votre forfait — changez de forfait pour en ajouter."
+
+msgid "Your name"
+msgstr "Votre nom"
+
+msgid "agent"
+msgstr "agents"
+
+msgid "contract"
+msgstr "contrats"
+
+msgid "contracts"
+msgstr "contrats"
+
+msgid "including how my organization's documents and contracts are stored."
+msgstr "y compris la manière dont les documents et contrats de mon organisation sont stockés."
+
+msgid "user"
+msgstr "utilisateurs"
+
+msgid "users"
+msgstr "utilisateurs"
+
+msgid "workflow"
+msgstr "flux de travail"
+

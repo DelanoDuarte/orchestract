@@ -21,6 +21,7 @@ from app.api.deps import (
     document_service,
     enforce_login_and_membership,
     get_current_organization_from_path,
+    install_request_locale,
     organization_service,
     registration_service,
     role_service,
@@ -59,11 +60,21 @@ from app.infrastructure.email.templates import (
     password_reset_email_html,
     verification_email_html,
 )
+from app.infrastructure.i18n import (
+    DEFAULT_LOCALE,
+    LOCALE_COOKIE_NAME,
+    LOCALE_NAMES,
+    SUPPORTED_LOCALES,
+    get_current_locale,
+    install_jinja_i18n,
+)
 from app.web.icons import icon, step_icon_name
 
 OAUTH_PROVIDER_LABELS = {StorageProvider.GOOGLE_DRIVE: "Google Drive", StorageProvider.ONEDRIVE: "OneDrive"}
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+# Enable {% trans %} / {{ _("...") }} backed by the per-request locale.
+install_jinja_i18n(templates.env)
 templates.env.globals["icon"] = icon
 templates.env.globals["step_icon"] = step_icon_name
 
@@ -88,8 +99,13 @@ templates.env.globals["terms_effective_date"] = TERMS_EFFECTIVE_DATE
 # Whether to render the "Continue with Google" button. Evaluated once at import
 # (settings are static per process), mirroring asset_version above.
 templates.env.globals["google_configured"] = google_login_enabled()
+# i18n: the active locale (a function, read at render time from the per-request
+# ContextVar) and the switcher's menu data.
+templates.env.globals["current_locale"] = get_current_locale
+templates.env.globals["locale_names"] = LOCALE_NAMES
+templates.env.globals["supported_locales"] = SUPPORTED_LOCALES
 
-root_router = APIRouter()
+root_router = APIRouter(dependencies=[Depends(install_request_locale)])
 org_router = APIRouter(prefix="/{org_slug}", dependencies=[Depends(enforce_login_and_membership)])
 
 
@@ -292,6 +308,32 @@ async def logout(request: Request):
     response.delete_cookie(
         SESSION_COOKIE_NAME, httponly=True, samesite="lax", secure=get_settings().session_cookie_secure
     )
+    return response
+
+
+@root_router.get("/set-language")
+async def set_language(request: Request, lang: str = "", next: str = "/"):
+    """Language switcher target. Writes the choice to a cookie (so it sticks for
+    anonymous visitors) and, if the visitor is logged in, persists it to their
+    profile so it follows them across devices. hx-boost is disabled on the
+    switcher links, so this is a full navigation that re-renders the translated
+    chrome."""
+    resolved = lang if lang in SUPPORTED_LOCALES else DEFAULT_LOCALE
+    # Only ever redirect to a same-origin path -- never an absolute URL.
+    target = next if next.startswith("/") and not next.startswith("//") else "/"
+    response = RedirectResponse(target, status_code=303)
+    response.set_cookie(
+        LOCALE_COOKIE_NAME,
+        resolved,
+        samesite="lax",
+        secure=get_settings().session_cookie_secure,
+        max_age=60 * 60 * 24 * 365,
+    )
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if token:
+        user = await user_service.get_user_by_session_token(token)
+        if user is not None:
+            await user_service.set_locale(user.id, resolved)
     return response
 
 
@@ -597,6 +639,7 @@ async def agents_page(
     agents = await agent_service.list_agents(organization.id)
     steps_owned = await _steps_owned_by_agent(organization.id)
     roles_by_agent = await _roles_by_agent(organization.id)
+    can_create_agent = PLAN_LIMITS[Plan(organization.plan)].can_add_agent(len(agents))
     return templates.TemplateResponse(
         request,
         "agents.html",
@@ -605,6 +648,7 @@ async def agents_page(
             "agents": agents,
             "steps_owned": steps_owned,
             "roles_by_agent": roles_by_agent,
+            "can_create_agent": can_create_agent,
             "active_nav": "agents",
         },
     )
@@ -1218,10 +1262,16 @@ async def workflows_page(
     request: Request, organization: Organization = Depends(get_current_organization_from_path)
 ):
     workflows = await workflow_service.list_for_organization(organization.id)
+    can_create_workflow = PLAN_LIMITS[Plan(organization.plan)].can_add_workflow(len(workflows))
     return templates.TemplateResponse(
         request,
         "workflows_list.html",
-        {"organization": organization, "workflows": workflows, "active_nav": "workflows"},
+        {
+            "organization": organization,
+            "workflows": workflows,
+            "can_create_workflow": can_create_workflow,
+            "active_nav": "workflows",
+        },
     )
 
 

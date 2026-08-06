@@ -4,9 +4,7 @@
 {% block content %}
 <div class="page reveal">
   {% call macros.page_header("Agents", "Departments and participants that own steps in a workflow. Create as many as you need.", eyebrow="Workspace") %}
-    <a href="/{{ organization.slug }}/agents/new" class="btn">
-      {{ icon('plus', 'size-4') }}<span>New agent</span>
-    </a>
+    {{ macros.create_or_upgrade(can_create_agent, organization.slug, "/" ~ organization.slug ~ "/agents/new", _("New agent"), _("agent")) }}
   {% endcall %}
 
   {% if error %}
@@ -60,7 +58,7 @@
           {% else %}
           <tr><td colspan="6" class="p-0">
             {% call macros.empty_state('users', 'No agents yet', 'Agents own the steps of your workflows. Create your first one to get started.') %}
-              <a href="/{{ organization.slug }}/agents/new" class="btn" data-size="sm">{{ icon('plus', 'size-4') }}<span>New agent</span></a>
+              {{ macros.create_or_upgrade(can_create_agent, organization.slug, "/" ~ organization.slug ~ "/agents/new", _("New agent"), _("agent"), size="sm") }}
             {% endcall %}
           </td></tr>
           {% endfor %}

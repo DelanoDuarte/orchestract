@@ -89,6 +89,10 @@ class User(Base):
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     email_verified_at: Mapped[datetime | None] = mapped_column(default=None)
+    # Preferred UI language (BCP-47-ish code like "pt"/"fr"). Null means the
+    # user hasn't chosen one, so the app falls back to their browser's
+    # Accept-Language and then English.
+    locale: Mapped[str | None] = mapped_column(String(10), default=None)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     @classmethod
@@ -157,6 +161,11 @@ class User(Base):
 
     def set_role(self, role_id: int) -> None:
         self.role_id = role_id
+
+    def set_locale(self, locale: str | None) -> None:
+        """Persist the user's preferred UI language. None clears it (revert to
+        browser/default negotiation)."""
+        self.locale = locale
 
     def deactivate(self) -> None:
         self.is_active = False

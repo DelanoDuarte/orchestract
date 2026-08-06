@@ -52,7 +52,17 @@ def test_can_add_contract_respects_the_plan_ceiling():
     assert free.can_add_contract(6) is False
 
 
+def test_can_add_workflow_and_agent_respect_the_free_ceiling():
+    free = PLAN_LIMITS[Plan.FREE]  # max_workflows=3, max_agents=3
+    assert free.can_add_workflow(2) is True
+    assert free.can_add_workflow(3) is False
+    assert free.can_add_agent(2) is True
+    assert free.can_add_agent(3) is False
+
+
 def test_unlimited_plan_always_allows_more():
-    business = PLAN_LIMITS[Plan.BUSINESS]  # max_users/max_contracts = None
+    business = PLAN_LIMITS[Plan.BUSINESS]  # all caps = None
     assert business.can_add_user(10_000) is True
     assert business.can_add_contract(10_000) is True
+    assert business.can_add_workflow(10_000) is True
+    assert business.can_add_agent(10_000) is True

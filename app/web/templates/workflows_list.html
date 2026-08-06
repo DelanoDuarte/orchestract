@@ -4,9 +4,7 @@
 {% block content %}
 <div class="page reveal">
   {% call macros.page_header("Workflow definitions", "Design the graph documents move through: steps owned by agents, wired together by transitions.", eyebrow="Workspace") %}
-    <a href="/{{ organization.slug }}/workflows/new" class="btn">
-      {{ icon('plus', 'size-4') }}<span>New workflow</span>
-    </a>
+    {{ macros.create_or_upgrade(can_create_workflow, organization.slug, "/" ~ organization.slug ~ "/workflows/new", _("New workflow"), _("workflow")) }}
   {% endcall %}
 
   {% if error %}
@@ -38,7 +36,7 @@
     {% else %}
     <div class="card sm:col-span-2 lg:col-span-3">
       {% call macros.empty_state('git-branch', 'No workflow definitions yet', 'Create a workflow to define the lifecycle your contracts follow.') %}
-        <a href="/{{ organization.slug }}/workflows/new" class="btn" data-size="sm">{{ icon('plus', 'size-4') }}<span>New workflow</span></a>
+        {{ macros.create_or_upgrade(can_create_workflow, organization.slug, "/" ~ organization.slug ~ "/workflows/new", _("New workflow"), _("workflow"), size="sm") }}
       {% endcall %}
     </div>
     {% endfor %}

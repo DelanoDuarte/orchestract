@@ -1,0 +1,20 @@
+{# Language switcher: a native <details> dropdown so it needs no JS. Each option
+   is a full navigation (hx-boost="false") to /set-language, which stores the
+   choice and redirects back to the current page. `next` is the current path so
+   the user stays put after switching. #}
+<details class="relative" id="lang-switcher">
+  <summary class="btn list-none [&::-webkit-details-marker]:hidden" data-variant="ghost" data-size="icon"
+           role="button" aria-haspopup="menu" aria-label="{{ _('Change language') }}" title="{{ _('Change language') }}">
+    {{ icon('languages', 'size-4') }}
+  </summary>
+  <div class="absolute right-0 z-50 mt-1.5 min-w-44 rounded-[var(--radius)] border border-border bg-popover p-1 text-popover-foreground shadow-md"
+       role="menu">
+    {% for code in supported_locales %}
+    <a href="/set-language?lang={{ code }}&next={{ request.url.path | urlencode }}" hx-boost="false" role="menuitem"
+       class="flex items-center justify-between gap-3 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground {{ 'font-medium text-primary' if code == current_locale() else '' }}">
+      <span>{{ locale_names[code] }}</span>
+      {% if code == current_locale() %}{{ icon('check', 'size-4') }}{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</details>

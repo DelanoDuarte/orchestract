@@ -18,6 +18,13 @@ from app.domain.tenancy.models import Organization
 from app.domain.users.models import User
 from app.infrastructure.db.session import async_session_factory
 from app.infrastructure.db.unit_of_work import UnitOfWork
+from app.infrastructure.i18n import (
+    DEFAULT_LOCALE,
+    LOCALE_COOKIE_NAME,
+    SUPPORTED_LOCALES,
+    negotiate_from_header,
+    set_current_locale,
+)
 
 SESSION_COOKIE_NAME = "session_token"
 
@@ -36,6 +43,36 @@ class TermsNotAcceptedError(Exception):
     Conditions version. Maps (via a handler in main.py) to a redirect to the
     consent screen, so a user can't reach any organization data until they
     accept -- the compliance gate for storing their documents in the cloud."""
+
+
+def _negotiate_and_set_locale(request: Request, user: User | None = None) -> str:
+    """Resolve the active UI language for this request and pin it for the
+    render (via the i18n ContextVar). Priority: the logged-in user's saved
+    preference, then the switcher cookie, then the browser's Accept-Language,
+    then English. Also stashes it on `request.state.locale` for templates."""
+    if user is not None and user.locale in SUPPORTED_LOCALES:
+        chosen: str | None = user.locale
+    else:
+        cookie = request.cookies.get(LOCALE_COOKIE_NAME)
+        if cookie in SUPPORTED_LOCALES:
+            chosen = cookie
+        else:
+            chosen = negotiate_from_header(request.headers.get("accept-language", "")) or DEFAULT_LOCALE
+    resolved = set_current_locale(chosen)
+    request.state.locale = resolved
+    return resolved
+
+
+async def install_request_locale(request: Request) -> None:
+    """Router-level dependency for public (unauthenticated) routes: negotiates
+    locale from cookie/browser only. Org-scoped routes resolve it inside
+    `enforce_login_and_membership` instead, where the user (and their saved
+    preference) is known.
+
+    Must be async: a sync dependency runs in a worker thread, and the i18n
+    ContextVar we set there wouldn't propagate to the endpoint's task where the
+    template renders."""
+    _negotiate_and_set_locale(request, user=None)
 
 
 def uow_factory() -> UnitOfWork:
@@ -116,6 +153,7 @@ async def enforce_login_and_membership(
         raise TermsNotAcceptedError()
     request.state.current_user = user
     request.state.current_role = await role_service.get(user.role_id)
+    _negotiate_and_set_locale(request, user=user)
 
 
 def current_user_dep(request: Request) -> User:

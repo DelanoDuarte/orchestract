@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}{{ contract.title }} · Shared review{% endblock %}
+{% block content %}
+<div class="mx-auto flex w-full max-w-3xl flex-col gap-6 py-6">
+  <div class="flex flex-col gap-2">
+    <span class="eyebrow inline-flex items-center gap-1.5">{{ icon('eye', 'size-3.5') }} Shared for review</span>
+    <h1 class="page-title">{{ contract.title }}</h1>
+    {% if contract.description %}
+    <p class="text-sm text-muted-foreground">{{ contract.description }}</p>
+    {% endif %}
+    <p class="text-xs text-muted-foreground">
+      {% if link.allow_download %}You can preview and download these documents.{% else %}You can preview these documents.{% endif %}
+      Access expires {{ link.expires_at.strftime("%Y-%m-%d %H:%M UTC") }}.
+    </p>
+  </div>
+
+  {% if contract.summary %}
+  <div class="rounded-[var(--radius)] border border-border bg-muted/30 p-4">
+    <p class="eyebrow">AI summary</p>
+    <p class="mt-1 text-sm">{{ contract.summary }}</p>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <header class="border-b border-border px-4 py-3">
+      <h2 class="section-title">Documents</h2>
+    </header>
+    <section class="flex flex-col divide-y divide-border">
+      {% for document in documents %}
+      {% set v = document.latest_version() %}
+      <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+          <h3 class="inline-flex items-center gap-2 text-sm font-semibold">
+            <span class="text-muted-foreground">{{ icon('file-text', 'size-4') }}</span>{{ document.name }}
+          </h3>
+          {% if v %}
+          <p class="mt-0.5 truncate text-xs text-muted-foreground">
+            {{ v.original_filename }} · {{ "%.1f KB"|format(v.size_bytes / 1024) }} · {{ v.created_at.strftime("%Y-%m-%d") }}
+          </p>
+          {% if document.summary %}
+          <p class="mt-1 text-sm text-muted-foreground">{{ document.summary }}</p>
+          {% endif %}
+          {% endif %}
+        </div>
+        {% if v %}
+        {% set ct = v.content_type or "" %}
+        {% set previewable = ct.startswith("image/") or ct == "application/pdf" or ct.startswith("text/") %}
+        {% set raw_url = "/share/" ~ token ~ "/documents/" ~ document.id ~ "/versions/" ~ v.id ~ "/raw" %}
+        <div class="flex flex-none items-center gap-2">
+          <button type="button" class="btn" data-variant="outline" data-size="sm" hx-boost="false"
+                  onclick="openDocPreview(this)"
+                  data-raw-url="{{ raw_url }}"
+                  data-download-url="{{ raw_url }}?download=1"
+                  data-filename="{{ v.original_filename }}"
+                  data-content-type="{{ ct }}"
+                  data-allow-download="{{ 'true' if link.allow_download else 'false' }}"
+                  data-previewable="{{ 'true' if previewable else 'false' }}">
+            {{ icon('eye', 'size-4') }}<span>Preview</span>
+          </button>
+          {% if link.allow_download %}
+          <a class="btn" data-variant="ghost" data-size="sm" href="{{ raw_url }}?download=1"
+             download="{{ v.original_filename }}" hx-boost="false">
+            {{ icon('external-link', 'size-4') }}<span class="hidden sm:inline">Download</span>
+          </a>
+          {% endif %}
+        </div>
+        {% else %}
+        <span class="text-xs text-muted-foreground">No file uploaded yet.</span>
+        {% endif %}
+      </div>
+      {% else %}
+      {{ macros.empty_state('file-text', 'Nothing to review', 'There are no documents shared with this link yet.') }}
+      {% endfor %}
+    </section>
+  </div>
+</div>
+
+<dialog id="doc-preview-dialog" class="dialog" aria-labelledby="doc-preview-title">
+  <article class="flex h-full flex-col">
+    <header class="flex flex-none items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h2 id="doc-preview-title" class="section-title truncate">Preview</h2>
+        <p id="doc-preview-meta" class="truncate text-sm text-muted-foreground"></p>
+      </div>
+      <div class="flex flex-none items-center gap-2">
+        <a id="doc-preview-download" class="btn hidden" data-variant="outline" data-size="sm" href="#" download>
+          {{ icon('external-link', 'size-4') }}<span class="hidden sm:inline">Download</span>
+        </a>
+        <button type="button" class="btn" data-variant="ghost" data-size="icon" aria-label="Close preview"
+                onclick="this.closest('dialog').close()">{{ icon('circle-x', 'size-4') }}</button>
+      </div>
+    </header>
+    <div class="mt-3 flex min-h-0 flex-1 flex-col">
+      <!-- Sandboxed so an uploaded HTML/SVG can't run script in our origin. -->
+      <iframe id="doc-preview-frame" title="Document preview" sandbox
+              class="hidden min-h-0 w-full flex-1 rounded-[var(--radius)] border border-border bg-white"></iframe>
+      <div id="doc-preview-unsupported" class="empty-state hidden flex-1">
+        <span class="icon-chip">{{ icon('file-text', 'size-5') }}</span>
+        <p class="font-medium text-foreground">Preview not available</p>
+        <p class="max-w-sm text-sm">This file type can't be shown in the browser.</p>
+      </div>
+    </div>
+  </article>
+</dialog>
+
+<script>
+  function openDocPreview(btn) {
+    var dialog = document.getElementById("doc-preview-dialog");
+    if (!dialog) return;
+    var frame = document.getElementById("doc-preview-frame");
+    var unsupported = document.getElementById("doc-preview-unsupported");
+    var filename = btn.getAttribute("data-filename") || "File";
+    document.getElementById("doc-preview-title").textContent = filename;
+    document.getElementById("doc-preview-meta").textContent = btn.getAttribute("data-content-type") || "";
+    var download = document.getElementById("doc-preview-download");
+    // Only offer a download from the dialog when the link permits it.
+    if (btn.getAttribute("data-allow-download") === "true") {
+      download.setAttribute("href", btn.getAttribute("data-download-url"));
+      download.setAttribute("download", filename);
+      download.classList.remove("hidden");
+    } else {
+      download.classList.add("hidden");
+      download.removeAttribute("href");
+    }
+    if (btn.getAttribute("data-previewable") === "true") {
+      frame.src = btn.getAttribute("data-raw-url");
+      frame.classList.remove("hidden");
+      unsupported.classList.add("hidden");
+    } else {
+      frame.removeAttribute("src");
+      frame.classList.add("hidden");
+      unsupported.classList.remove("hidden");
+    }
+    dialog.showModal();
+  }
+  // Stop loading/rendering the framed file once the dialog is dismissed.
+  (function () {
+    var dialog = document.getElementById("doc-preview-dialog");
+    if (dialog && !dialog.dataset.previewBound) {
+      dialog.dataset.previewBound = "1";
+      dialog.addEventListener("close", function () {
+        var frame = document.getElementById("doc-preview-frame");
+        if (frame) frame.removeAttribute("src");
+      });
+    }
+  })();
+</script>
+{% endblock %}

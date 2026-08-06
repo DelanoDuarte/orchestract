@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Link unavailable{% endblock %}
+{% block content %}
+<div class="mx-auto flex w-full max-w-sm flex-col items-center gap-4 py-16 text-center">
+  <span class="icon-chip">{{ icon('ban', 'size-5') }}</span>
+  <h1 class="page-title">This link is no longer available</h1>
+  <p class="text-sm text-muted-foreground">
+    The share link you followed has expired or was revoked by its owner.
+    Ask them to send you a new one.
+  </p>
+</div>
+{% endblock %}

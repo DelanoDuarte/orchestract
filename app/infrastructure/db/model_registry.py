@@ -9,6 +9,7 @@ from app.domain.compliance import models as _compliance_models  # noqa: F401
 from app.domain.contracts import models as _contracts_models  # noqa: F401
 from app.domain.documents import models as _documents_models  # noqa: F401
 from app.domain.shared.base import Base
+from app.domain.sharing import models as _sharing_models  # noqa: F401
 from app.domain.storage import models as _storage_models  # noqa: F401
 from app.domain.tenancy import models as _tenancy_models  # noqa: F401
 from app.domain.users import models as _users_models  # noqa: F401

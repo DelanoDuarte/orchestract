@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from app.domain.sharing.models import ShareLink
+
+
+class ShareLinkRepository(Protocol):
+    async def add(self, link: ShareLink) -> None: ...
+
+    async def get(self, link_id: int) -> ShareLink | None: ...
+
+    async def get_by_token(self, token: str) -> ShareLink | None: ...
+
+    async def list_for_contract(self, contract_id: int) -> list[ShareLink]: ...

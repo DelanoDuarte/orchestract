@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Password required{% endblock %}
+{% block content %}
+<div class="mx-auto flex w-full max-w-sm flex-col gap-6 py-6 sm:py-12">
+  <div class="flex flex-col items-center gap-3 text-center">
+    <span class="icon-chip">{{ icon('lock', 'size-5') }}</span>
+    <div class="space-y-1">
+      <h1 class="page-title">Password required</h1>
+      <p class="text-sm text-muted-foreground">
+        This document review is protected. Enter the password shared with you to continue.
+      </p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="alert" data-variant="destructive">
+    <section>{{ error }}</section>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/share/{{ token }}/unlock" class="card flex flex-col gap-4 p-6" hx-boost="false">
+    <div role="group" class="field">
+      <label for="share-password">Password</label>
+      <input id="share-password" type="password" name="password" required autofocus autocomplete="off"
+             placeholder="••••••••">
+    </div>
+    <button type="submit" class="btn w-full">
+      {{ icon('arrow-right', 'size-4') }}<span>Continue</span>
+    </button>
+  </form>
+</div>
+{% endblock %}

@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import secrets
 import urllib.parse
@@ -25,6 +27,7 @@ from app.api.deps import (
     organization_service,
     registration_service,
     role_service,
+    sharing_service,
     social_auth_service,
     storage_service,
     user_service,
@@ -34,8 +37,10 @@ from app.application.permissions import assert_can_edit_contract_step
 from app.application.workflow_presets import PRESETS_BY_KEY, WORKFLOW_PRESETS, WorkflowPreset
 from app.config import get_settings
 from app.domain.compliance.terms import CURRENT_TERMS_VERSION, TERMS_EFFECTIVE_DATE
-from app.domain.shared.types import slugify
+from app.domain.shared.types import slugify, utcnow
 from app.domain.shared.exceptions import DomainError, NotFoundError
+from app.domain.sharing.exceptions import ShareLinkNotActiveError
+from app.domain.sharing.models import ShareScope
 from app.domain.storage.models import StorageProvider
 from app.domain.tenancy.models import Organization
 from app.domain.tenancy.plans import PLAN_LIMITS, Plan
@@ -1583,9 +1588,12 @@ async def _contract_detail_context(organization: Organization, contract_id: int,
     can_edit = await role_service.can_edit_step(current_user, current_step_agent_id)
     edit_roles = await role_service.list_for_agent(current_step_agent_id)
     total_versions = sum(len(document.versions) for document in contract.documents)
+    share_links = [link for link in await sharing_service.list_for_contract(contract_id) if link.is_active()]
     return {
         "organization": organization,
         "contract": contract,
+        "share_links": share_links,
+        "share_base_url": get_settings().app_base_url.rstrip("/"),
         "instance": instance,
         "definition": definition,
         "current_step_name": step_name,
@@ -1751,28 +1759,13 @@ def _content_disposition_filename(name: str) -> str:
     return cleaned.strip() or "file"
 
 
-@org_router.get("/contracts/{contract_id}/documents/{document_id}/versions/{version_id}/raw")
-async def document_version_raw(
-    contract_id: int,
-    document_id: int,
-    version_id: int,
-    request: Request,
-    download: bool = False,
-    organization: Organization = Depends(get_current_organization_from_path),
-    current_user: User = Depends(current_user_dep),
-):
-    """Streams a stored file version's bytes for inline preview or download.
-    Scoped to the org (defense in depth) and served with hardening headers so
-    an uploaded HTML/SVG can't run script in our origin: `nosniff` plus a
-    sandbox CSP -- previews additionally render inside a sandboxed iframe."""
-    contract = await contract_service.get(contract_id)
-    document = await document_service.get(document_id)
-    version = next((v for v in document.versions if v.id == version_id), None)
-    if contract.organization_id != organization.id or document.contract_id != contract_id or version is None:
-        raise NotFoundError("file version not found")
-    data = await document_service.download_version(version)
-    disposition = "attachment" if download else "inline"
+def _stored_file_response(data: bytes, version, download: bool) -> Response:
+    """Serve a stored file version's bytes for inline preview or download with
+    hardening headers so an uploaded HTML/SVG can't run script in our origin:
+    `nosniff` plus a sandbox CSP (previews additionally render inside a
+    sandboxed iframe). Shared with the external share-link viewer."""
     filename = _content_disposition_filename(version.original_filename)
+    disposition = "attachment" if download else "inline"
     return Response(
         content=data,
         media_type=version.content_type or "application/octet-stream",
@@ -1790,6 +1783,173 @@ async def document_version_raw(
             "Cache-Control": "private, no-store",
         },
     )
+
+
+@org_router.get("/contracts/{contract_id}/documents/{document_id}/versions/{version_id}/raw")
+async def document_version_raw(
+    contract_id: int,
+    document_id: int,
+    version_id: int,
+    request: Request,
+    download: bool = False,
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    """Streams a stored file version's bytes for inline preview or download.
+    Scoped to the org (defense in depth); hardening headers live in
+    `_stored_file_response`."""
+    contract = await contract_service.get(contract_id)
+    document = await document_service.get(document_id)
+    version = next((v for v in document.versions if v.id == version_id), None)
+    if contract.organization_id != organization.id or document.contract_id != contract_id or version is None:
+        raise NotFoundError("file version not found")
+    data = await document_service.download_version(version)
+    return _stored_file_response(data, version, download)
+
+
+# --- External share links -----------------------------------------------------
+#
+# A ShareLink lets an unregistered reviewer view (and optionally download) a
+# contract's documents through an unguessable /share/<token> URL, optionally
+# behind a password, until it expires or is revoked. The management endpoints
+# below are org-scoped (behind auth); the /share/... endpoints further down are
+# public (on root_router) and never touch org membership.
+
+_SHARE_EXPIRY_CHOICES = (24, 72, 168, 720)  # 1 day, 3 days, 7 days, 30 days
+SHARE_UNLOCK_COOKIE = "share_unlock"
+
+
+@org_router.post("/contracts/{contract_id}/share")
+async def create_share_link(
+    contract_id: int,
+    request: Request,
+    scope: str = Form("contract"),
+    document_ids: list[int] = Form([]),
+    allow_download: str = Form(""),
+    password: str = Form(""),
+    expires_in_hours: int = Form(168),
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    try:
+        share_scope = ShareScope.DOCUMENTS if scope == "documents" else ShareScope.CONTRACT
+        ttl_hours = expires_in_hours if expires_in_hours in _SHARE_EXPIRY_CHOICES else 168
+        await sharing_service.create_link(
+            contract_id,
+            share_scope,
+            allow_download=bool(allow_download),
+            expires_in_hours=ttl_hours,
+            created_by=current_user.name,
+            document_ids=document_ids,
+            raw_password=password.strip() or None,
+        )
+    except DomainError as exc:
+        context = await _contract_detail_context(organization, contract_id, current_user)
+        context["error"] = str(exc)
+        return templates.TemplateResponse(request, "contract_detail.html", context, status_code=422)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "Share link created."
+    )
+
+
+@org_router.post("/contracts/{contract_id}/share/{link_id}/revoke")
+async def revoke_share_link(
+    contract_id: int,
+    link_id: int,
+    request: Request,
+    organization: Organization = Depends(get_current_organization_from_path),
+    current_user: User = Depends(current_user_dep),
+):
+    await sharing_service.revoke(contract_id, link_id)
+    return _flash(
+        await contract_detail(contract_id, request, organization, current_user), "Share link revoked."
+    )
+
+
+def _share_unlock_token(token: str) -> str:
+    """Stateless proof the correct password was entered for `token`: an HMAC
+    over the share token keyed by the app's persistent secret. Re-derived and
+    constant-time-compared on each request, so it can't be forged and needs no
+    table of its own -- the ShareLink row remains the source of truth for
+    expiry/revocation, re-checked on every request."""
+    key = get_settings().storage_encryption_key.encode()
+    return hmac.new(key, f"share:{token}".encode(), hashlib.sha256).hexdigest()
+
+
+def _is_share_unlocked(request: Request, token: str) -> bool:
+    presented = request.cookies.get(SHARE_UNLOCK_COOKIE)
+    return bool(presented) and hmac.compare_digest(presented, _share_unlock_token(token))
+
+
+@root_router.get("/share/{token}")
+async def share_landing(token: str, request: Request):
+    """Public entry point for an external reviewer. Renders the invalid page
+    for a dead link, the password gate for a protected one that hasn't been
+    unlocked in this browser, otherwise the document viewer."""
+    try:
+        link = await sharing_service.get_active_link(token)
+    except ShareLinkNotActiveError:
+        return templates.TemplateResponse(request, "share_invalid.html", {"full_width": True}, status_code=404)
+    if link.has_password and not _is_share_unlocked(request, token):
+        return templates.TemplateResponse(request, "share_access.html", {"token": token, "full_width": True})
+    await sharing_service.mark_accessed(token)
+    contract, documents = await sharing_service.resolve_shared_documents(link)
+    return templates.TemplateResponse(
+        request,
+        "share_view.html",
+        {"token": token, "link": link, "contract": contract, "documents": documents, "full_width": True},
+    )
+
+
+@root_router.post("/share/{token}/unlock")
+async def share_unlock(token: str, request: Request, password: str = Form("")):
+    try:
+        link = await sharing_service.get_active_link(token)
+    except ShareLinkNotActiveError:
+        return templates.TemplateResponse(request, "share_invalid.html", {"full_width": True}, status_code=404)
+    if not link.has_password or not link.verify_password(password):
+        return templates.TemplateResponse(
+            request,
+            "share_access.html",
+            {"token": token, "full_width": True, "error": "Incorrect password."},
+            status_code=422,
+        )
+    response = RedirectResponse(f"/share/{token}", status_code=303)
+    max_age = max(0, int((link.expires_at - utcnow()).total_seconds()))
+    # Path-scoped so the unlock cookie is only ever sent for this one link and
+    # can't unlock a different token the same browser also holds.
+    response.set_cookie(
+        SHARE_UNLOCK_COOKIE,
+        _share_unlock_token(token),
+        max_age=max_age,
+        httponly=True,
+        samesite="lax",
+        secure=get_settings().session_cookie_secure,
+        path=f"/share/{token}",
+    )
+    return response
+
+
+@root_router.get("/share/{token}/documents/{document_id}/versions/{version_id}/raw")
+async def share_document_raw(
+    token: str,
+    document_id: int,
+    version_id: int,
+    request: Request,
+    download: bool = False,
+):
+    """Streams a shared file version to an external reviewer. Re-validates the
+    link is active and (if protected) unlocked on every request, and refuses an
+    attachment download unless the link permits it -- inline preview stays
+    available for view-only links."""
+    try:
+        link = await sharing_service.get_active_link(token)
+    except ShareLinkNotActiveError:
+        raise NotFoundError("file version not found")
+    if link.has_password and not _is_share_unlocked(request, token):
+        raise NotFoundError("file version not found")
+    version, data = await sharing_service.get_shared_version(link, document_id, version_id)
+    return _stored_file_response(data, version, download and link.allow_download)
 
 
 @org_router.post("/contracts/{contract_id}/summarize")

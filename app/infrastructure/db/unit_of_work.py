@@ -9,6 +9,9 @@ from app.infrastructure.db.repositories.organizations import (
     SqlAlchemyOrganizationRepository,
 )
 from app.infrastructure.db.repositories.roles import SqlAlchemyRoleRepository
+from app.infrastructure.db.repositories.share_links import (
+    SqlAlchemyShareLinkRepository,
+)
 from app.infrastructure.db.repositories.storage_connections import (
     SqlAlchemyStorageConnectionRepository,
 )
@@ -45,6 +48,7 @@ class UnitOfWork:
     contracts: SqlAlchemyContractRepository
     documents: SqlAlchemyDocumentRepository
     storage_connections: SqlAlchemyStorageConnectionRepository
+    share_links: SqlAlchemyShareLinkRepository
     roles: SqlAlchemyRoleRepository
     users: SqlAlchemyUserRepository
     user_sessions: SqlAlchemyUserSessionRepository
@@ -63,6 +67,7 @@ class UnitOfWork:
         self.contracts = SqlAlchemyContractRepository(self.session)
         self.documents = SqlAlchemyDocumentRepository(self.session)
         self.storage_connections = SqlAlchemyStorageConnectionRepository(self.session)
+        self.share_links = SqlAlchemyShareLinkRepository(self.session)
         self.roles = SqlAlchemyRoleRepository(self.session)
         self.users = SqlAlchemyUserRepository(self.session)
         self.user_sessions = SqlAlchemyUserSessionRepository(self.session)

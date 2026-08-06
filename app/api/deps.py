@@ -9,6 +9,7 @@ from app.application.document_service import DocumentService
 from app.application.organization_service import OrganizationService
 from app.application.registration_service import RegistrationService
 from app.application.role_service import RoleService
+from app.application.sharing_service import SharingService
 from app.application.social_auth_service import SocialAuthService
 from app.application.storage_service import StorageService
 from app.application.user_service import UserService
@@ -84,6 +85,7 @@ agent_service = AgentService(uow_factory)
 workflow_service = WorkflowService(uow_factory)
 storage_service = StorageService(uow_factory)
 document_service = DocumentService(uow_factory, storage_service)
+sharing_service = SharingService(uow_factory, document_service)
 contract_service = ContractService(uow_factory)
 role_service = RoleService(uow_factory)
 user_service = UserService(uow_factory)
